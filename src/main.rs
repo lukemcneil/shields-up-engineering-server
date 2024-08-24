@@ -1,8 +1,9 @@
 mod input;
 
-use std::collections::BTreeMap;
-
 use input::{choose_action, choose_card_index, choose_system};
+use rand::seq::SliceRandom;
+use rand::thread_rng;
+use std::{collections::BTreeMap, process::exit};
 
 #[derive(Debug, Clone, Default)]
 struct Card {
@@ -23,7 +24,6 @@ enum Effect {
     Attack,
     DiscardOverload,
     GainAction,
-    SpendAction,
 
     PlayHotWire,
     Discard,
@@ -123,28 +123,87 @@ impl PlayerState {
         &mut self,
         effects: &[Effect],
         opponent_state: &mut PlayerState,
+        shared_state: &mut SharedState,
     ) -> ResolveEffectResult {
         for effect in effects {
             match effect {
-                Effect::GainShortCircuit => todo!(),
-                Effect::LoseShortCircuit => todo!(),
-                Effect::StoreMoreEnergy => todo!(),
-                Effect::UseMoreEnergy => todo!(),
-                Effect::UseLessEnergy => todo!(),
-                Effect::Shield => todo!(),
-                Effect::Attack => todo!(),
-                Effect::DiscardOverload => todo!(),
-                Effect::GainAction => todo!(),
-                Effect::SpendAction => todo!(),
-                Effect::PlayHotWire => todo!(),
-                Effect::Discard => todo!(),
-                Effect::Draw => todo!(),
-                Effect::OpponentDiscard => todo!(),
-                Effect::OpponentGainShortCircuit => todo!(),
-                Effect::OpponentLoseShield => todo!(),
+                Effect::GainShortCircuit => {
+                    self.short_circuits += 1;
+                    if self.short_circuits == 12 {
+                        println!("lost by getting 12 short circuits");
+                        exit(0);
+                    }
+                }
+                Effect::LoseShortCircuit => self.short_circuits = (self.short_circuits - 1).max(0),
+                Effect::StoreMoreEnergy => (),
+                Effect::UseMoreEnergy => (),
+                Effect::UseLessEnergy => (),
+                Effect::Shield => self.shields += 1,
+                Effect::Attack => {
+                    if opponent_state.shields > 0 {
+                        opponent_state.shields -= 1;
+                    } else {
+                        opponent_state.hull_damage += 1;
+                        if opponent_state.hull_damage >= 5 {
+                            println!("lost by taking 5 damage");
+                            exit(0);
+                        }
+                    }
+                }
+                Effect::DiscardOverload => {
+                    let system_state = self.systems.get_mut(&choose_system()).unwrap();
+                    if system_state.overloads == 0 {
+                        println!("no overloads to discard")
+                    } else {
+                        system_state.overloads -= 1;
+                    }
+                }
+                Effect::GainAction => self.actions += 1,
+                Effect::PlayHotWire => {
+                    let card_index = choose_card_index(self.hand.len());
+                    match card_index {
+                        Some(card_index) => {
+                            let _ = self.try_to_do_action(
+                                Action::HotWireCard {
+                                    card_index,
+                                    system: choose_system(),
+                                },
+                                opponent_state,
+                                shared_state,
+                            );
+                        }
+                        None => println!("no card to hot wire"),
+                    }
+                }
+                Effect::Discard => {
+                    self.discard(1, shared_state);
+                }
+                Effect::Draw => {
+                    if shared_state.deck.is_empty() {
+                        shared_state.deck.append(&mut shared_state.discard_pile);
+                        shared_state.deck.shuffle(&mut thread_rng());
+                    }
+                    match shared_state.deck.pop() {
+                        Some(card) => self.hand.push(card),
+                        None => println!("no card to draw"),
+                    };
+                }
+                Effect::OpponentDiscard => {
+                    opponent_state.discard(1, shared_state);
+                }
+                Effect::OpponentGainShortCircuit => {
+                    opponent_state.short_circuits += 1;
+                    if opponent_state.short_circuits == 12 {
+                        println!("lost by getting 12 short circuits");
+                        exit(0);
+                    }
+                }
+                Effect::OpponentLoseShield => {
+                    opponent_state.shields = (opponent_state.shields - 1).max(0)
+                }
                 Effect::OpponentMoveEnergy => todo!(),
-                Effect::OpponentGainOverload => todo!(),
-                Effect::DrawPowerFrom(_) => todo!(),
+                Effect::OpponentGainOverload => opponent_state.overload_system(choose_system()),
+                Effect::DrawPowerFrom(_) => (),
                 Effect::MoveEnergy => todo!(),
                 Effect::MoveEnergyTo(_) => todo!(),
                 Effect::UseSystemCards(_) => todo!(),
@@ -178,7 +237,7 @@ impl PlayerState {
                         ));
                     }
                 }
-                if self.resolve_effects(&card.hot_wire_cost, opponent_state)
+                if self.resolve_effects(&card.hot_wire_cost, opponent_state, shared_state)
                     == ResolveEffectResult::CouldNotDiscard
                 {
                     return Err("don't have enough cards to discard".to_string());
@@ -188,7 +247,7 @@ impl PlayerState {
             }
             Action::PlayInstantCard { card_index } => {
                 let card = self.hand.remove(card_index);
-                if self.resolve_effects(&card.instant_effects, opponent_state)
+                if self.resolve_effects(&card.instant_effects, opponent_state, shared_state)
                     == ResolveEffectResult::CouldNotDiscard
                 {
                     return Err("don't have enough cards to discard".to_string());
@@ -202,7 +261,7 @@ impl PlayerState {
                 for hot_wire_card in &system_state.hot_wires {
                     system_effects.append(&mut hot_wire_card.hot_wire_effects.clone());
                 }
-                self.resolve_effects(&system_effects, opponent_state);
+                self.resolve_effects(&system_effects, opponent_state, shared_state);
                 Ok(())
             }
             Action::DiscardOverload { system } => {
@@ -218,6 +277,7 @@ impl PlayerState {
                 self.resolve_effects(
                     &[Effect::LoseShortCircuit, Effect::LoseShortCircuit],
                     opponent_state,
+                    shared_state,
                 );
                 Ok(())
             }
