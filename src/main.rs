@@ -2,9 +2,9 @@ mod input;
 
 use std::collections::BTreeMap;
 
-use input::{choose_action, choose_system};
+use input::{choose_action, choose_card_index, choose_system};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct Card {
     instant_effects: Vec<Effect>,
     hot_wire_effects: Vec<Effect>,
@@ -12,7 +12,7 @@ struct Card {
     system: Option<System>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 enum Effect {
     GainShortCircuit,
     LoseShortCircuit,
@@ -56,6 +56,17 @@ enum System {
     ShieldGenerator,
 }
 
+impl System {
+    fn starting_effects(&self) -> Vec<Effect> {
+        match self {
+            System::FusionReactor => vec![],
+            System::LifeSupport => vec![Effect::Draw, Effect::Draw],
+            System::Weapons => vec![Effect::Attack],
+            System::ShieldGenerator => vec![Effect::Shield],
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct PlayerState {
     hull_damage: i32,
@@ -83,7 +94,15 @@ impl PlayerState {
             hull_damage: 0,
             shields: 2,
             short_circuits: 0,
-            hand: vec![],
+            hand: vec![
+                Card::default(),
+                Card::default(),
+                Card::default(),
+                Card::default(),
+                Card::default(),
+                Card::default(),
+                Card::default(),
+            ],
             systems,
             actions: 3,
         }
@@ -92,7 +111,7 @@ impl PlayerState {
     fn do_turn(&mut self, opponent_state: &mut PlayerState, shared_state: &mut SharedState) {
         self.actions = 3;
         while let Some(action) = choose_action(self) {
-            if let Err(e) = self.try_to_do_action(action, opponent_state) {
+            if let Err(e) = self.try_to_do_action(action, opponent_state, shared_state) {
                 println!("failed to do action {:?} because {}", action, e);
             }
         }
@@ -100,10 +119,45 @@ impl PlayerState {
         self.check_system_overload();
     }
 
+    fn resolve_effects(
+        &mut self,
+        effects: &[Effect],
+        opponent_state: &mut PlayerState,
+    ) -> ResolveEffectResult {
+        for effect in effects {
+            match effect {
+                Effect::GainShortCircuit => todo!(),
+                Effect::LoseShortCircuit => todo!(),
+                Effect::StoreMoreEnergy => todo!(),
+                Effect::UseMoreEnergy => todo!(),
+                Effect::UseLessEnergy => todo!(),
+                Effect::Shield => todo!(),
+                Effect::Attack => todo!(),
+                Effect::DiscardOverload => todo!(),
+                Effect::GainAction => todo!(),
+                Effect::SpendAction => todo!(),
+                Effect::PlayHotWire => todo!(),
+                Effect::Discard => todo!(),
+                Effect::Draw => todo!(),
+                Effect::OpponentDiscard => todo!(),
+                Effect::OpponentGainShortCircuit => todo!(),
+                Effect::OpponentLoseShield => todo!(),
+                Effect::OpponentMoveEnergy => todo!(),
+                Effect::OpponentGainOverload => todo!(),
+                Effect::DrawPowerFrom(_) => todo!(),
+                Effect::MoveEnergy => todo!(),
+                Effect::MoveEnergyTo(_) => todo!(),
+                Effect::UseSystemCards(_) => todo!(),
+            }
+        }
+        ResolveEffectResult::Resolved
+    }
+
     fn try_to_do_action(
         &mut self,
         action: Action,
         opponent_state: &mut PlayerState,
+        shared_state: &mut SharedState,
     ) -> Result<(), String> {
         if action.action_points() > self.actions {
             return Err(format!(
@@ -114,12 +168,57 @@ impl PlayerState {
         let my_state_before = self.clone();
         let opponent_state_before = opponent_state.clone();
         let result = match action {
-            Action::HotWireCard { card_index } => todo!(),
-            Action::PlayInstantCard { card_index } => todo!(),
-            Action::ActivateSystem { system } => todo!(),
-            Action::DiscardOverload { system } => Err("todo".to_string()),
+            Action::HotWireCard { card_index, system } => {
+                let card = self.hand.remove(card_index);
+                if let Some(card_system) = card.system {
+                    if system != card_system {
+                        return Err(format!(
+                            "cannot hot wire {:?} card on {:?}",
+                            card_system, system
+                        ));
+                    }
+                }
+                if self.resolve_effects(&card.hot_wire_cost, opponent_state)
+                    == ResolveEffectResult::CouldNotDiscard
+                {
+                    return Err("don't have enough cards to discard".to_string());
+                }
+                self.systems.get_mut(&system).unwrap().hot_wires.push(card);
+                Ok(())
+            }
+            Action::PlayInstantCard { card_index } => {
+                let card = self.hand.remove(card_index);
+                if self.resolve_effects(&card.instant_effects, opponent_state)
+                    == ResolveEffectResult::CouldNotDiscard
+                {
+                    return Err("don't have enough cards to discard".to_string());
+                }
+                shared_state.discard_pile.push(card);
+                Ok(())
+            }
+            Action::ActivateSystem { system } => {
+                let system_state = self.systems.get_mut(&system).unwrap();
+                let mut system_effects = system.starting_effects();
+                for hot_wire_card in &system_state.hot_wires {
+                    system_effects.append(&mut hot_wire_card.hot_wire_effects.clone());
+                }
+                self.resolve_effects(&system_effects, opponent_state);
+                Ok(())
+            }
+            Action::DiscardOverload { system } => {
+                let system_state = self.systems.get_mut(&system).unwrap();
+                if system_state.overloads == 0 {
+                    Err(format!("no overloads to remove on {:?}", system))
+                } else {
+                    system_state.overloads -= 1;
+                    Ok(())
+                }
+            }
             Action::ReduceShortCircuits => {
-                self.short_circuits = (self.short_circuits - 2).max(0);
+                self.resolve_effects(
+                    &[Effect::LoseShortCircuit, Effect::LoseShortCircuit],
+                    opponent_state,
+                );
                 Ok(())
             }
         };
@@ -135,7 +234,29 @@ impl PlayerState {
         result
     }
 
-    fn check_hand_size(&mut self, shared_state: &mut SharedState) {}
+    fn check_hand_size(&mut self, shared_state: &mut SharedState) {
+        if self.hand.len() > 5 {
+            println!(
+                "over hand limit need to discard {} cards",
+                self.hand.len() - 5
+            );
+            self.discard(self.hand.len() - 5, shared_state);
+        }
+    }
+
+    fn discard(&mut self, amount: usize, shared_state: &mut SharedState) -> bool {
+        for _ in 0..amount {
+            if self.hand.is_empty() {
+                return false;
+            }
+            println!("choose a card to discard");
+            let index = choose_card_index(self.hand.len()).expect("just checked hand is not empty");
+            let discarded_card = self.hand.remove(index);
+            println!("discarded {:?}", discarded_card);
+            shared_state.discard_pile.push(discarded_card);
+        }
+        true
+    }
 
     fn check_system_overload(&mut self) {
         while self.short_circuits >= 5 {
@@ -156,9 +277,15 @@ impl PlayerState {
     }
 }
 
+#[derive(PartialEq, Eq)]
+enum ResolveEffectResult {
+    Resolved,
+    CouldNotDiscard,
+}
+
 #[derive(Debug, Clone, Copy)]
 enum Action {
-    HotWireCard { card_index: usize },
+    HotWireCard { card_index: usize, system: System },
     PlayInstantCard { card_index: usize },
     ActivateSystem { system: System },
     DiscardOverload { system: System },

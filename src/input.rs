@@ -72,7 +72,12 @@ pub fn choose_action(my_state: &PlayerState) -> Option<Action> {
         };
         match number {
             0 => match choose_card_index(my_state.hand.len()) {
-                Some(card_index) => return Some(Action::HotWireCard { card_index }),
+                Some(card_index) => {
+                    return Some(Action::HotWireCard {
+                        card_index,
+                        system: choose_system(),
+                    })
+                }
                 None => println!("Cannot hot wire card, don't have any cards"),
             },
             1 => match choose_card_index(my_state.hand.len()) {
