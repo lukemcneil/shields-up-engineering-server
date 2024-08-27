@@ -1,6 +1,7 @@
-mod input;
+// mod input;
+mod tests;
 
-use input::{choose_action, choose_card_index, choose_energy_distribution, choose_system};
+// use input::{choose_action, choose_card_index, choose_energy_distribution, choose_system};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::process::exit;
@@ -14,6 +15,8 @@ fn print_list_and_indices(name: &str, things: Vec<String>) {
         .collect();
     println!("{}]", x.join(", "));
 }
+
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Default)]
 struct Card {
@@ -173,7 +176,6 @@ struct PlayerState {
     life_support: SystemState,
     shield_generator: SystemState,
     weapons_system: SystemState,
-    actions: i32,
 }
 
 impl PlayerState {
@@ -227,7 +229,6 @@ impl PlayerState {
             life_support: SystemState::with_energy(2, System::LifeSupport),
             shield_generator: SystemState::with_energy(1, System::ShieldGenerator),
             weapons_system: SystemState::with_energy(2, System::Weapons),
-            actions: 3,
         }
     }
 
@@ -240,293 +241,153 @@ impl PlayerState {
         }
     }
 
-    fn do_turn(&mut self, opponent_state: &mut PlayerState, shared_state: &mut SharedState) {
-        self.actions = 3;
-        while let Some(action) = choose_action(self) {
-            if let Err(e) = self.try_to_do_action(action, opponent_state, shared_state) {
-                println!("failed to do action {:?} because {}", action, e);
-            }
-        }
-        self.check_hand_size(shared_state);
-        self.check_system_overload();
-    }
+    // fn resolve_effects(
+    //     &mut self,
+    //     mut effects: Vec<Effect>,
+    //     choose_order: bool,
+    //     opponent_state: &mut PlayerState,
+    //     shared_state: &mut SharedState,
+    // ) -> ResolveEffectResult {
+    //     effects = effects
+    //         .iter()
+    //         .filter(|e| e.has_immediate_effect())
+    //         .cloned()
+    //         .collect();
+    //     effects.sort();
+    //     loop {
+    //         if effects.is_empty() {
+    //             break;
+    //         }
+    //         let effect = if choose_order {
+    //             println!("choose an effect");
+    //             print_list_and_indices(
+    //                 "Effects",
+    //                 effects.iter().map(|e| format!("{:?}", e)).collect(),
+    //             );
+    //             let index = choose_card_index(effects.len()).unwrap();
+    //             effects.remove(index)
+    //         } else {
+    //             effects.pop().unwrap()
+    //         };
+    //         match effect {
+    //             Effect::GainShortCircuit => {
+    //                 self.short_circuits += 1;
+    //                 if self.short_circuits == 12 {
+    //                     println!("you lost by getting 12 short circuits");
+    //                     exit(0);
+    //                 }
+    //             }
+    //             Effect::LoseShortCircuit => self.short_circuits = (self.short_circuits - 1).max(0),
+    //             Effect::Shield => {
+    //                 if self.shields < self.shield_generator.get_allowed_energy() {
+    //                     self.shields += 1;
+    //                 } else {
+    //                     println!("already at max shields")
+    //                 }
+    //             }
+    //             Effect::Attack => {
+    //                 if opponent_state.shields > 0 {
+    //                     opponent_state.shields -= 1;
+    //                 } else {
+    //                     opponent_state.hull_damage += 1;
+    //                     if opponent_state.hull_damage >= 5 {
+    //                         println!("opponent lost by taking 5 damage");
+    //                         exit(0);
+    //                     }
+    //                 }
+    //             }
+    //             Effect::DiscardOverload => {
+    //                 let system_state = self.get_system_state(choose_system());
+    //                 if system_state.overloads == 0 {
+    //                     println!("no overloads to discard")
+    //                 } else {
+    //                     system_state.overloads -= 1;
+    //                 }
+    //             }
+    //             Effect::GainAction => (),
+    //             Effect::PlayHotWire => {
+    //                 // let card_index = choose_card_index(self.hand.len());
+    //                 // match card_index {
+    //                 //     Some(card_index) => {
+    //                 //         let _ = self.try_to_do_action(
+    //                 //             Action::HotWireCard {
+    //                 //                 card_index,
+    //                 //                 system: choose_system(),
+    //                 //             },
+    //                 //             opponent_state,
+    //                 //             shared_state,
+    //                 //         );
+    //                 //     }
+    //                 //     None => println!("no card to hot wire"),
+    //                 // }
+    //             }
+    //             Effect::Discard => {
+    //                 self.discard(1, shared_state);
+    //             }
+    //             Effect::Draw => {
+    //                 if shared_state.deck.is_empty() {
+    //                     shared_state.deck.append(&mut shared_state.discard_pile);
+    //                     shared_state.deck.shuffle(&mut thread_rng());
+    //                 }
+    //                 match shared_state.deck.pop() {
+    //                     Some(card) => self.hand.push(card),
+    //                     None => println!("no card to draw"),
+    //                 };
+    //             }
+    //             Effect::OpponentDiscard => {
+    //                 opponent_state.discard(1, shared_state);
+    //             }
+    //             Effect::OpponentGainShortCircuit => {
+    //                 opponent_state.short_circuits += 1;
+    //                 if opponent_state.short_circuits == 12 {
+    //                     println!("opponent lost by getting 12 short circuits");
+    //                     exit(0);
+    //                 }
+    //             }
+    //             Effect::OpponentLoseShield => {
+    //                 opponent_state.shields = (opponent_state.shields - 1).max(0)
+    //             }
+    //             Effect::OpponentGainOverload => opponent_state.overload_system(choose_system()),
+    //             Effect::StoreMoreEnergy | Effect::UseMoreEnergy | Effect::UseLessEnergy => (),
+    //             // Effect::OpponentMoveEnergy => todo!(),
+    //             // Effect::DrawPowerFrom(_) => (),
+    //             // Effect::MoveEnergy => todo!(),
+    //             // Effect::MoveEnergyTo(_) => todo!(),
+    //             // Effect::UseSystemCards(_) => todo!(),
+    //         }
+    //     }
+    //     ResolveEffectResult::Resolved
+    // }
 
-    fn resolve_effects(
-        &mut self,
-        mut effects: Vec<Effect>,
-        choose_order: bool,
-        opponent_state: &mut PlayerState,
-        shared_state: &mut SharedState,
-    ) -> ResolveEffectResult {
-        effects = effects
-            .iter()
-            .filter(|e| e.has_immediate_effect())
-            .cloned()
-            .collect();
-        effects.sort();
-        loop {
-            if effects.is_empty() {
-                break;
-            }
-            let effect = if choose_order {
-                println!("choose an effect");
-                print_list_and_indices(
-                    "Effects",
-                    effects.iter().map(|e| format!("{:?}", e)).collect(),
-                );
-                let index = choose_card_index(effects.len()).unwrap();
-                effects.remove(index)
-            } else {
-                effects.pop().unwrap()
-            };
-            match effect {
-                Effect::GainShortCircuit => {
-                    self.short_circuits += 1;
-                    if self.short_circuits == 12 {
-                        println!("you lost by getting 12 short circuits");
-                        exit(0);
-                    }
-                }
-                Effect::LoseShortCircuit => self.short_circuits = (self.short_circuits - 1).max(0),
-                Effect::Shield => {
-                    if self.shields < self.shield_generator.get_allowed_energy() {
-                        self.shields += 1;
-                    } else {
-                        println!("already at max shields")
-                    }
-                }
-                Effect::Attack => {
-                    if opponent_state.shields > 0 {
-                        opponent_state.shields -= 1;
-                    } else {
-                        opponent_state.hull_damage += 1;
-                        if opponent_state.hull_damage >= 5 {
-                            println!("opponent lost by taking 5 damage");
-                            exit(0);
-                        }
-                    }
-                }
-                Effect::DiscardOverload => {
-                    let system_state = self.get_system_state(choose_system());
-                    if system_state.overloads == 0 {
-                        println!("no overloads to discard")
-                    } else {
-                        system_state.overloads -= 1;
-                    }
-                }
-                Effect::GainAction => self.actions += 1,
-                Effect::PlayHotWire => {
-                    let card_index = choose_card_index(self.hand.len());
-                    match card_index {
-                        Some(card_index) => {
-                            let _ = self.try_to_do_action(
-                                Action::HotWireCard {
-                                    card_index,
-                                    system: choose_system(),
-                                },
-                                opponent_state,
-                                shared_state,
-                            );
-                        }
-                        None => println!("no card to hot wire"),
-                    }
-                }
-                Effect::Discard => {
-                    self.discard(1, shared_state);
-                }
-                Effect::Draw => {
-                    if shared_state.deck.is_empty() {
-                        shared_state.deck.append(&mut shared_state.discard_pile);
-                        shared_state.deck.shuffle(&mut thread_rng());
-                    }
-                    match shared_state.deck.pop() {
-                        Some(card) => self.hand.push(card),
-                        None => println!("no card to draw"),
-                    };
-                }
-                Effect::OpponentDiscard => {
-                    opponent_state.discard(1, shared_state);
-                }
-                Effect::OpponentGainShortCircuit => {
-                    opponent_state.short_circuits += 1;
-                    if opponent_state.short_circuits == 12 {
-                        println!("opponent lost by getting 12 short circuits");
-                        exit(0);
-                    }
-                }
-                Effect::OpponentLoseShield => {
-                    opponent_state.shields = (opponent_state.shields - 1).max(0)
-                }
-                Effect::OpponentGainOverload => opponent_state.overload_system(choose_system()),
-                Effect::StoreMoreEnergy | Effect::UseMoreEnergy | Effect::UseLessEnergy => (),
-                // Effect::OpponentMoveEnergy => todo!(),
-                // Effect::DrawPowerFrom(_) => (),
-                // Effect::MoveEnergy => todo!(),
-                // Effect::MoveEnergyTo(_) => todo!(),
-                // Effect::UseSystemCards(_) => todo!(),
-            }
-        }
-        ResolveEffectResult::Resolved
-    }
+    // fn check_hand_size(&mut self, shared_state: &mut SharedState) {
+    //     if self.hand.len() > 5 {
+    //         println!(
+    //             "over hand limit need to discard {} cards",
+    //             self.hand.len() - 5
+    //         );
+    //         self.discard(self.hand.len() - 5, shared_state);
+    //     }
+    // }
 
-    fn try_to_do_action(
-        &mut self,
-        action: Action,
-        opponent_state: &mut PlayerState,
-        shared_state: &mut SharedState,
-    ) -> Result<(), String> {
-        if action.action_points() > self.actions {
-            return Err(format!(
-                "do not have enough action points to do {:?}",
-                action
-            ));
-        }
-        let my_state_before = self.clone();
-        let opponent_state_before = opponent_state.clone();
-        let shared_state_before = shared_state.clone();
-        let result = match action {
-            Action::HotWireCard { card_index, system } => {
-                let card = self.hand.remove(card_index);
-                if let Some(card_system) = card.system {
-                    if system != card_system {
-                        return Err(format!(
-                            "cannot hot wire {:?} card on {:?}",
-                            card_system, system
-                        ));
-                    }
-                }
-                if self.resolve_effects(
-                    card.hot_wire_cost.clone(),
-                    false,
-                    opponent_state,
-                    shared_state,
-                ) == ResolveEffectResult::CouldNotDiscard
-                {
-                    return Err("don't have enough cards to discard".to_string());
-                }
-                if system == System::FusionReactor {
-                    self.fusion_reactor.energy += card
-                        .hot_wire_effects
-                        .iter()
-                        .filter(|&&e| e == Effect::StoreMoreEnergy)
-                        .count() as i32;
-                }
-                self.get_system_state(system).hot_wires.push(card);
-                Ok(())
-            }
-            Action::PlayInstantCard { card_index } => {
-                let card = self.hand.remove(card_index);
-                if self.resolve_effects(
-                    card.instant_effects.clone(),
-                    true,
-                    opponent_state,
-                    shared_state,
-                ) == ResolveEffectResult::CouldNotDiscard
-                {
-                    return Err("don't have enough cards to discard".to_string());
-                }
-                shared_state.discard_pile.push(card);
-                Ok(())
-            }
-            Action::ActivateSystem { system } => {
-                let system_state = self.get_system_state(system);
-                if system_state.overloads > 0 {
-                    return Err(format!("cannot activate overloaded system {:?}", system));
-                }
-                match system {
-                    System::FusionReactor => {
-                        let total_energy = self.fusion_reactor.get_allowed_energy();
-                        let energy_distribution = choose_energy_distribution(self, total_energy);
-                        for (system, energy) in energy_distribution {
-                            let system_state = self.get_system_state(system);
-                            if system_state.overloads > 0
-                                && energy > 0
-                                && system != System::FusionReactor
-                            {
-                                return Err(format!(
-                                    "cannot put energy on overloaded system {:?}",
-                                    system
-                                ));
-                            }
-                            system_state.energy = energy;
-                        }
-                    }
-                    System::LifeSupport | System::Weapons | System::ShieldGenerator => {
-                        let used_energy = system_state.get_energy_used();
-                        if used_energy > system_state.energy {
-                            return Err(format!("not enough energy to activate {:?}", system));
-                        } else {
-                            system_state.energy -= used_energy;
-                            self.fusion_reactor.energy += used_energy;
-                        }
-                    }
-                }
-                let system_state = self.get_system_state(system);
-                let system_effects = system_state.get_hot_wire_effects();
-                self.resolve_effects(system_effects, true, opponent_state, shared_state);
-                Ok(())
-            }
-            Action::DiscardOverload { system } => {
-                let system_state = self.get_system_state(system);
-                if system_state.overloads == 0 {
-                    Err(format!("no overloads to remove on {:?}", system))
-                } else {
-                    system_state.overloads -= 1;
-                    Ok(())
-                }
-            }
-            Action::ReduceShortCircuits => {
-                self.resolve_effects(
-                    vec![Effect::LoseShortCircuit, Effect::LoseShortCircuit],
-                    false,
-                    opponent_state,
-                    shared_state,
-                );
-                Ok(())
-            }
-        };
-        match result {
-            Ok(_) => {
-                self.actions -= action.action_points();
-            }
-            Err(_) => {
-                *self = my_state_before;
-                *opponent_state = opponent_state_before;
-                *shared_state = shared_state_before;
-            }
-        };
-        result
-    }
-
-    fn check_hand_size(&mut self, shared_state: &mut SharedState) {
-        if self.hand.len() > 5 {
-            println!(
-                "over hand limit need to discard {} cards",
-                self.hand.len() - 5
-            );
-            self.discard(self.hand.len() - 5, shared_state);
-        }
-    }
-
-    fn discard(&mut self, amount: usize, shared_state: &mut SharedState) -> bool {
-        for _ in 0..amount {
-            if self.hand.is_empty() {
-                return false;
-            }
-            println!("choose a card to discard");
-            let index = choose_card_index(self.hand.len()).expect("just checked hand is not empty");
-            let discarded_card = self.hand.remove(index);
-            println!("discarded {:?}", discarded_card);
-            shared_state.discard_pile.push(discarded_card);
-        }
-        true
-    }
+    // fn discard(&mut self, amount: usize, shared_state: &mut SharedState) -> bool {
+    //     for _ in 0..amount {
+    //         if self.hand.is_empty() {
+    //             return false;
+    //         }
+    //         println!("choose a card to discard");
+    //         let index = choose_card_index(self.hand.len()).expect("just checked hand is not empty");
+    //         let discarded_card = self.hand.remove(index);
+    //         println!("discarded {:?}", discarded_card);
+    //         shared_state.discard_pile.push(discarded_card);
+    //     }
+    //     true
+    // }
 
     fn check_system_overload(&mut self) {
         while self.short_circuits >= 5 {
             println!("have 5 or more short circuits, system overload, choose a system to disable");
             // TODO: this is supposed to go on the system with most hotwires
-            self.overload_system(choose_system());
+            // self.overload_system(choose_system());
             self.short_circuits -= 5;
         }
     }
@@ -546,21 +407,12 @@ enum ResolveEffectResult {
     CouldNotDiscard,
 }
 
-#[derive(Debug, Clone, Copy)]
-enum Action {
-    HotWireCard { card_index: usize, system: System },
-    PlayInstantCard { card_index: usize },
-    ActivateSystem { system: System },
-    DiscardOverload { system: System },
-    ReduceShortCircuits,
-}
-
 impl Action {
     fn action_points(&self) -> i32 {
         match self {
             Action::HotWireCard { .. } => 1,
             Action::PlayInstantCard { .. } => 0,
-            Action::ActivateSystem { system } => match system {
+            Action::ActivateSystem { system, .. } => match system {
                 System::FusionReactor => 2,
                 System::LifeSupport => 1,
                 System::Weapons => 1,
@@ -572,20 +424,272 @@ impl Action {
     }
 }
 
-#[derive(Clone)]
-struct SharedState {
+#[derive(Debug, Clone)]
+enum Action {
+    HotWireCard {
+        card_index: usize,
+        system: System,
+    },
+    PlayInstantCard {
+        card_index: usize,
+    },
+    ActivateSystem {
+        system: System,
+        energy_distribution: Option<BTreeMap<System, i32>>,
+    },
+    DiscardOverload {
+        system: System,
+    },
+    ReduceShortCircuits,
+}
+
+enum UserAction {
+    ChooseAction { action: Action },
+    ResolveEffect { effect: Effect },
+    Pass { card_indices_to_discard: Vec<usize> },
+}
+
+struct UserActionWithPlayer {
+    player: Player,
+    user_action: UserAction,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+enum Player {
+    Player1,
+    Player2,
+}
+
+#[derive(Clone, Debug)]
+enum TurnState {
+    ChoosingAction,
+    ResolvingEffects { effects: Vec<Effect> },
+}
+
+#[derive(Clone, Debug)]
+struct GameState {
+    player1: PlayerState,
+    player2: PlayerState,
     deck: Vec<Card>,
     discard_pile: Vec<Card>,
+    players_turn: Player,
+    actions_left: i32,
+    turn_state: TurnState,
+}
+
+impl GameState {
+    fn start_state() -> Self {
+        let player1 = PlayerState::start_state();
+        let player2 = PlayerState::start_state();
+        Self {
+            players_turn: Player::Player1,
+            turn_state: TurnState::ChoosingAction,
+            player1,
+            player2,
+            deck: vec![Card::default(), Card::default()],
+            discard_pile: vec![],
+            actions_left: 3,
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Debug)]
+enum UserActionError {
+    NotYourTurn,
+    NotEnoughCardsToDiscard,
+    NotEnoughActionsLeft,
+    SystemHasNoOverload,
+    MissingEnergyDistribution,
+    InvalidEnergyDistribution,
+    CannotPutEnergyOnDisabledSystem,
+    InvalidCardIndex,
+    CannotActivateOverloadedSystem,
+    NotEnoughEnergyToActivate,
+    InvalidUserAction,
+}
+
+impl GameState {
+    fn choose_action(&mut self, action: Action, player: Player) -> Result<(), UserActionError> {
+        if action.action_points() > self.actions_left {
+            return Err(UserActionError::NotEnoughActionsLeft);
+        }
+        let result = match action.clone() {
+            Action::HotWireCard { card_index, system } => {
+                let my_state = self.my_state(player);
+                if card_index >= my_state.hand.len() {
+                    return Err(UserActionError::InvalidCardIndex);
+                }
+                let card = my_state.hand.remove(card_index);
+                let discard_count = card
+                    .hot_wire_effects
+                    .iter()
+                    .filter(|&&e| e == Effect::Discard)
+                    .count();
+                if discard_count > my_state.hand.len() {
+                    return Err(UserActionError::NotEnoughCardsToDiscard);
+                }
+                my_state
+                    .get_system_state(system)
+                    .hot_wires
+                    .push(card.clone());
+                self.turn_state = TurnState::ResolvingEffects {
+                    effects: card.hot_wire_cost,
+                };
+                Ok(())
+            }
+            Action::PlayInstantCard { card_index } => {
+                let my_state = self.my_state(player);
+                if card_index >= my_state.hand.len() {
+                    return Err(UserActionError::InvalidCardIndex);
+                }
+                let card = my_state.hand.remove(card_index);
+                self.discard_pile.push(card.clone());
+                self.turn_state = TurnState::ResolvingEffects {
+                    effects: card.instant_effects,
+                };
+                Ok(())
+            }
+            Action::ActivateSystem {
+                system,
+                energy_distribution,
+            } => {
+                let my_state = self.my_state(player);
+                if my_state.get_system_state(system).overloads > 0 {
+                    return Err(UserActionError::CannotActivateOverloadedSystem);
+                }
+                if system == System::FusionReactor {
+                    if let Some(energy_distribution) = energy_distribution {
+                        let allocated_energy = energy_distribution.values().sum::<i32>();
+                        if allocated_energy != my_state.fusion_reactor.get_allowed_energy() {
+                            return Err(UserActionError::InvalidEnergyDistribution);
+                        }
+                        for (system, energy) in energy_distribution {
+                            let system_state = my_state.get_system_state(system);
+                            if system_state.overloads > 0 && energy > 0 {
+                                return Err(UserActionError::CannotPutEnergyOnDisabledSystem);
+                            }
+                            system_state.energy = energy;
+                        }
+                    } else {
+                        return Err(UserActionError::MissingEnergyDistribution);
+                    }
+                } else {
+                    let system_state = my_state.get_system_state(system);
+                    let energy_used = system_state.get_energy_used();
+                    if energy_used > system_state.energy {
+                        return Err(UserActionError::NotEnoughEnergyToActivate);
+                    }
+                    system_state.energy -= energy_used;
+                    my_state.fusion_reactor.energy += energy_used;
+                }
+                self.turn_state = TurnState::ResolvingEffects {
+                    effects: my_state.get_system_state(system).get_hot_wire_effects(),
+                };
+                Ok(())
+            }
+            Action::DiscardOverload { system } => {
+                let my_state = self.my_state(player);
+                let system_state = my_state.get_system_state(system);
+                if system_state.overloads > 0 {
+                    system_state.overloads -= 1;
+                    Ok(())
+                } else {
+                    Err(UserActionError::SystemHasNoOverload)
+                }
+            }
+            Action::ReduceShortCircuits => {
+                self.turn_state = TurnState::ResolvingEffects {
+                    effects: vec![Effect::LoseShortCircuit, Effect::LoseShortCircuit],
+                };
+                Ok(())
+            }
+        };
+        if result.is_ok() {
+            self.actions_left -= action.action_points();
+        }
+        result
+    }
+
+    fn receive_user_action(
+        &mut self,
+        user_action_with_player: UserActionWithPlayer,
+    ) -> Result<(), UserActionError> {
+        let game_state_before = self.clone();
+        let player = user_action_with_player.player;
+        let result = if self.players_turn == player {
+            match (&self.turn_state, user_action_with_player.user_action) {
+                (TurnState::ChoosingAction, UserAction::ChooseAction { action }) => {
+                    self.choose_action(action, player)
+                }
+                (TurnState::ResolvingEffects { effects }, UserAction::ResolveEffect { effect }) => {
+                    todo!()
+                }
+                (
+                    TurnState::ChoosingAction,
+                    UserAction::Pass {
+                        card_indices_to_discard,
+                    },
+                ) => {
+                    self.actions_left = 3;
+                    match self.players_turn {
+                        Player::Player1 => self.players_turn = Player::Player2,
+                        Player::Player2 => self.players_turn = Player::Player1,
+                    }
+                    // TODO: discard cards and check short circuits
+                    return Ok(());
+                }
+                (TurnState::ChoosingAction, UserAction::ResolveEffect { .. }) => {
+                    Err(UserActionError::InvalidUserAction)
+                }
+                (TurnState::ResolvingEffects { .. }, UserAction::ChooseAction { .. }) => {
+                    Err(UserActionError::InvalidUserAction)
+                }
+                (TurnState::ResolvingEffects { .. }, UserAction::Pass { .. }) => {
+                    Err(UserActionError::InvalidUserAction)
+                }
+            }
+        } else {
+            println!("making a user action when it's not your turn");
+            Err(UserActionError::NotYourTurn)
+        };
+        if result.is_err() {
+            *self = game_state_before;
+        }
+        self.remove_effects_without_immediate_effects();
+        result
+    }
+
+    fn remove_effects_without_immediate_effects(&mut self) {
+        if let TurnState::ResolvingEffects { effects } = &mut self.turn_state {
+            effects.retain(Effect::has_immediate_effect);
+        }
+    }
+
+    fn my_state(&mut self, player: Player) -> &mut PlayerState {
+        match player {
+            Player::Player1 => &mut self.player1,
+            Player::Player2 => &mut self.player2,
+        }
+    }
+
+    fn opponent_state(&mut self, player: Player) -> &mut PlayerState {
+        match player {
+            Player::Player1 => &mut self.player2,
+            Player::Player2 => &mut self.player1,
+        }
+    }
 }
 
 fn main() {
-    let mut state1 = PlayerState::start_state();
-    let mut state2 = PlayerState::start_state();
-    let mut shared_state = SharedState {
-        deck: vec![Card::default(), Card::default()],
-        discard_pile: vec![Card::default()],
-    };
-    loop {
-        state1.do_turn(&mut state2, &mut shared_state);
-    }
+    let mut game_state = GameState::start_state();
+    let result = game_state.receive_user_action(UserActionWithPlayer {
+        player: Player::Player1,
+        user_action: UserAction::ChooseAction {
+            action: Action::ReduceShortCircuits,
+        },
+    });
+    assert!(result.is_ok());
+    // loop {
+    //     game_state
+    // }
 }
