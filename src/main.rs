@@ -1,11 +1,6 @@
 // mod input;
 mod tests;
 
-// use input::{choose_action, choose_card_index, choose_energy_distribution, choose_system};
-use rand::seq::SliceRandom;
-use rand::thread_rng;
-use std::process::exit;
-
 fn print_list_and_indices(name: &str, things: Vec<String>) {
     print!("{} - [", name);
     let x: Vec<String> = things
