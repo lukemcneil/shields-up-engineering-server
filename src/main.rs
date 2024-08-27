@@ -364,20 +364,6 @@ impl PlayerState {
     //     }
     // }
 
-    // fn discard(&mut self, amount: usize, shared_state: &mut SharedState) -> bool {
-    //     for _ in 0..amount {
-    //         if self.hand.is_empty() {
-    //             return false;
-    //         }
-    //         println!("choose a card to discard");
-    //         let index = choose_card_index(self.hand.len()).expect("just checked hand is not empty");
-    //         let discarded_card = self.hand.remove(index);
-    //         println!("discarded {:?}", discarded_card);
-    //         shared_state.discard_pile.push(discarded_card);
-    //     }
-    //     true
-    // }
-
     fn check_system_overload(&mut self) {
         while self.short_circuits >= 5 {
             println!("have 5 or more short circuits, system overload, choose a system to disable");
@@ -501,6 +487,8 @@ enum UserActionError {
     CannotActivateOverloadedSystem,
     NotEnoughEnergyToActivate,
     InvalidUserAction,
+    InvalidDiscardIndices,
+    WrongNumberOfDiscardIndices,
 }
 
 impl GameState {
@@ -630,7 +618,14 @@ impl GameState {
                         Player::Player1 => self.players_turn = Player::Player2,
                         Player::Player2 => self.players_turn = Player::Player1,
                     }
-                    // TODO: discard cards and check short circuits
+                    if self.my_state(player).hand.len() > 5 {
+                        let cards_to_discard = self.my_state(player).hand.len() - 5;
+                        if cards_to_discard != card_indices_to_discard.len() {
+                            return Err(UserActionError::WrongNumberOfDiscardIndices);
+                        }
+                        self.discard(player, card_indices_to_discard)?;
+                    }
+                    // TODO: check short circuits
                     return Ok(());
                 }
                 (TurnState::ChoosingAction, UserAction::ResolveEffect { .. }) => {
@@ -652,6 +647,24 @@ impl GameState {
         }
         self.remove_effects_without_immediate_effects();
         result
+    }
+
+    fn discard(
+        &mut self,
+        player: Player,
+        mut card_indices: Vec<usize>,
+    ) -> Result<(), UserActionError> {
+        card_indices.sort();
+        card_indices.reverse();
+        for i in card_indices {
+            let my_state = self.my_state(player);
+            if i >= my_state.hand.len() {
+                return Err(UserActionError::InvalidDiscardIndices);
+            }
+            let discarded_card = my_state.hand.remove(i);
+            self.discard_pile.push(discarded_card);
+        }
+        Ok(())
     }
 
     fn remove_effects_without_immediate_effects(&mut self) {
