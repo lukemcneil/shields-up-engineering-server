@@ -219,6 +219,7 @@ impl PlayerState {
                 Card::default(),
                 Card::default(),
                 Card::default(),
+                Card::default(),
             ],
             fusion_reactor: SystemState::with_energy(0, System::FusionReactor),
             life_support: SystemState::with_energy(2, System::LifeSupport),

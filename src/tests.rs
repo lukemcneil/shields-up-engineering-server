@@ -41,7 +41,7 @@ mod tests {
         let result = game_state.receive_user_action(UserActionWithPlayer {
             player: Player::Player1,
             user_action: UserAction::Pass {
-                card_indices_to_discard: vec![],
+                card_indices_to_discard: vec![5],
             },
         });
         assert!(result.is_ok());
