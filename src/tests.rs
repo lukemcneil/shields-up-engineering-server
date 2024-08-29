@@ -8,15 +8,7 @@ mod tests {
         let result = game_state.receive_user_action(UserActionWithPlayer {
             player: Player::Player1,
             user_action: UserAction::ResolveEffect {
-                effect: Effect::Attack,
-            },
-        });
-        assert!(result.is_err_and(|e| e == UserActionError::InvalidUserAction));
-
-        let result = game_state.receive_user_action(UserActionWithPlayer {
-            player: Player::Player1,
-            user_action: UserAction::ResolveEffect {
-                effect: Effect::Attack,
+                resolve_effect: ResolveEffect::Attack,
             },
         });
         assert!(result.is_err_and(|e| e == UserActionError::InvalidUserAction));
@@ -122,7 +114,7 @@ mod tests {
     }
 
     #[test]
-    fn test_activate_weaponse() {
+    fn test_activate_weapons() {
         let mut game_state = GameState::start_state();
         let result = game_state.receive_user_action(UserActionWithPlayer {
             player: Player::Player1,
@@ -135,11 +127,96 @@ mod tests {
         });
         assert_eq!(result, Ok(()));
         assert_eq!(game_state.actions_left, 2);
-        match game_state.turn_state {
+        match &game_state.turn_state {
             TurnState::ChoosingAction => assert!(false),
             TurnState::ResolvingEffects { effects } => {
-                assert_eq!(effects, vec![Effect::Attack]);
+                assert_eq!(effects, &vec![Effect::Attack]);
             }
         }
+
+        let result = game_state.receive_user_action(UserActionWithPlayer {
+            player: Player::Player1,
+            user_action: UserAction::ResolveEffect {
+                resolve_effect: ResolveEffect::Attack,
+            },
+        });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.turn_state, TurnState::ChoosingAction);
+        assert_eq!(game_state.actions_left, 2);
+        assert_eq!(game_state.player2.shields, 1);
+    }
+
+    #[test]
+    fn test_shields() {
+        let mut game_state = GameState::start_state();
+        game_state.player1.hand = vec![
+            Card {
+                instant_effects: vec![],
+                hot_wire_effects: vec![Effect::Shield],
+                hot_wire_cost: HotWireCost {
+                    short_circuits: 7,
+                    cards_to_discard: 1,
+                },
+                system: Some(System::ShieldGenerator),
+            },
+            Card::default(),
+        ];
+        let result = game_state.receive_user_action(UserActionWithPlayer {
+            player: Player::Player1,
+            user_action: UserAction::ChooseAction {
+                action: Action::HotWireCard {
+                    card_index: 0,
+                    system: System::ShieldGenerator,
+                    indices_to_discard: vec![1],
+                },
+            },
+        });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.player1.shield_generator.hot_wires.len(), 1);
+        assert_eq!(game_state.actions_left, 2);
+
+        let result = game_state.receive_user_action(UserActionWithPlayer {
+            player: Player::Player1,
+            user_action: UserAction::ChooseAction {
+                action: Action::ActivateSystem {
+                    system: System::ShieldGenerator,
+                    energy_distribution: None,
+                },
+            },
+        });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.actions_left, 1);
+        match &game_state.turn_state {
+            TurnState::ChoosingAction => assert!(false),
+            TurnState::ResolvingEffects { effects } => {
+                assert_eq!(effects, &vec![Effect::Shield, Effect::Shield]);
+            }
+        }
+
+        let result = game_state.receive_user_action(UserActionWithPlayer {
+            player: Player::Player1,
+            user_action: UserAction::ResolveEffect {
+                resolve_effect: ResolveEffect::Shield,
+            },
+        });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.actions_left, 1);
+        assert_eq!(game_state.player1.shields, 3);
+
+        let result = game_state.receive_user_action(UserActionWithPlayer {
+            player: Player::Player1,
+            user_action: UserAction::ResolveEffect {
+                resolve_effect: ResolveEffect::Shield,
+            },
+        });
+        assert_eq!(result, Err(UserActionError::AlreadyAtMaxShields));
+
+        let result = game_state.receive_user_action(UserActionWithPlayer {
+            player: Player::Player1,
+            user_action: UserAction::StopResolvingEffects,
+        });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.turn_state, TurnState::ChoosingAction);
+        assert_eq!(game_state.actions_left, 1);
     }
 }
