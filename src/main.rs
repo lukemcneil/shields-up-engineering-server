@@ -516,9 +516,8 @@ impl GameState {
                 }
             }
             Action::ReduceShortCircuits => {
-                self.turn_state = TurnState::ResolvingEffects {
-                    effects: vec![Effect::LoseShortCircuit, Effect::LoseShortCircuit],
-                };
+                let my_state = self.my_state(player);
+                my_state.short_circuits = (my_state.short_circuits - 2).max(0);
                 Ok(())
             }
         };
