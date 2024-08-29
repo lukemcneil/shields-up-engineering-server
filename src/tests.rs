@@ -174,6 +174,8 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(game_state.player1.shield_generator.hot_wires.len(), 1);
         assert_eq!(game_state.actions_left, 2);
+        assert_eq!(game_state.player1.short_circuits, 7);
+        assert_eq!(game_state.player1.hand.len(), 0);
 
         let result = game_state.receive_user_action(UserActionWithPlayer {
             player: Player::Player1,
@@ -218,5 +220,75 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(game_state.turn_state, TurnState::ChoosingAction);
         assert_eq!(game_state.actions_left, 1);
+    }
+
+    #[test]
+    fn test_move_energy() {
+        let mut game_state = GameState::start_state();
+        game_state.player1.hand = vec![Card {
+            instant_effects: vec![
+                Effect::MoveEnergy,
+                Effect::MoveEnergyTo(System::ShieldGenerator),
+                Effect::OpponentMoveEnergy,
+            ],
+            hot_wire_effects: vec![],
+            hot_wire_cost: HotWireCost {
+                short_circuits: 0,
+                cards_to_discard: 0,
+            },
+            system: None,
+        }];
+        let result = game_state.receive_user_action(UserActionWithPlayer {
+            player: Player::Player1,
+            user_action: UserAction::ChooseAction {
+                action: Action::PlayInstantCard { card_index: 0 },
+            },
+        });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.actions_left, 3);
+
+        let result = game_state.receive_user_action(UserActionWithPlayer {
+            player: Player::Player1,
+            user_action: UserAction::ResolveEffect {
+                resolve_effect: ResolveEffect::MoveEnergy {
+                    from_system: System::ShieldGenerator,
+                    to_system: System::Weapons,
+                },
+            },
+        });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.player1.shield_generator.energy, 0);
+        assert_eq!(game_state.player1.weapons_system.energy, 3);
+
+        let result = game_state.receive_user_action(UserActionWithPlayer {
+            player: Player::Player1,
+            user_action: UserAction::ResolveEffect {
+                resolve_effect: ResolveEffect::MoveEnergyTo {
+                    from_system: System::LifeSupport,
+                    to_system: System::ShieldGenerator,
+                },
+            },
+        });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.player1.shield_generator.energy, 1);
+        assert_eq!(game_state.player1.weapons_system.energy, 3);
+        assert_eq!(game_state.player1.life_support.energy, 1);
+
+        let result = game_state.receive_user_action(UserActionWithPlayer {
+            player: Player::Player1,
+            user_action: UserAction::ResolveEffect {
+                resolve_effect: ResolveEffect::OpponentMoveEnergy {
+                    from_system: System::LifeSupport,
+                    to_system: System::ShieldGenerator,
+                },
+            },
+        });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.player1.shield_generator.energy, 1);
+        assert_eq!(game_state.player1.weapons_system.energy, 3);
+        assert_eq!(game_state.player1.life_support.energy, 1);
+        assert_eq!(game_state.player2.shield_generator.energy, 2);
+        assert_eq!(game_state.player2.weapons_system.energy, 2);
+        assert_eq!(game_state.player2.life_support.energy, 1);
     }
 }

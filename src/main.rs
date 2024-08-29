@@ -38,11 +38,11 @@ enum Effect {
     // OpponentDiscard, // TODO: put back in
     OpponentGainShortCircuit,
     OpponentLoseShield,
-    // OpponentMoveEnergy,
+    OpponentMoveEnergy,
     OpponentGainOverload,
     // DrawPowerFrom(System),
-    // MoveEnergy,
-    // MoveEnergyTo(System),
+    MoveEnergy,
+    MoveEnergyTo(System),
     // UseSystemCards(System),
 }
 
@@ -67,14 +67,22 @@ enum ResolveEffect {
     // },
     OpponentGainShortCircuit,
     OpponentLoseShield,
-    // OpponentMoveEnergy,
+    OpponentMoveEnergy {
+        from_system: System,
+        to_system: System,
+    },
     OpponentGainOverload {
         system: System,
     },
     // DrawPowerFrom(System),
-    // MoveEnergy,
-    // MoveEnergyTo(System),
-    // UseSystemCards(System),
+    MoveEnergy {
+        from_system: System,
+        to_system: System,
+    },
+    MoveEnergyTo {
+        from_system: System,
+        to_system: System,
+    }, // UseSystemCards(System),
 }
 
 impl ResolveEffect {
@@ -91,6 +99,9 @@ impl ResolveEffect {
             ResolveEffect::OpponentGainShortCircuit => Effect::OpponentGainShortCircuit,
             ResolveEffect::OpponentLoseShield => Effect::OpponentLoseShield,
             ResolveEffect::OpponentGainOverload { .. } => Effect::OpponentGainOverload,
+            ResolveEffect::OpponentMoveEnergy { .. } => Effect::OpponentMoveEnergy,
+            ResolveEffect::MoveEnergy { .. } => Effect::MoveEnergy,
+            ResolveEffect::MoveEnergyTo { to_system, .. } => Effect::MoveEnergyTo(*to_system),
         }
     }
 }
@@ -108,7 +119,10 @@ impl Effect {
             | Effect::Draw
             | Effect::OpponentGainShortCircuit
             | Effect::OpponentLoseShield
-            | Effect::OpponentGainOverload => true,
+            | Effect::OpponentGainOverload
+            | Effect::OpponentMoveEnergy
+            | Effect::MoveEnergy
+            | Effect::MoveEnergyTo(_) => true,
             Effect::StoreMoreEnergy | Effect::UseMoreEnergy | Effect::UseLessEnergy => false,
         }
     }
@@ -128,7 +142,10 @@ impl Effect {
             | Effect::Draw
             | Effect::OpponentGainShortCircuit
             | Effect::OpponentLoseShield
-            | Effect::OpponentGainOverload => false,
+            | Effect::OpponentGainOverload
+            | Effect::OpponentMoveEnergy
+            | Effect::MoveEnergy
+            | Effect::MoveEnergyTo(_) => false,
         }
     }
 }
@@ -316,6 +333,15 @@ enum Player {
     Player2,
 }
 
+impl Player {
+    fn other_player(&self) -> Self {
+        match self {
+            Player::Player1 => Player::Player2,
+            Player::Player2 => Player::Player1,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum TurnState {
     ChoosingAction,
@@ -373,6 +399,8 @@ enum UserActionError {
     CannotHotWireCardOnThisSystem,
     StillHaveSomeEffectsThatMustBeResolved,
     NoCardToDraw,
+    NoEnergyToMoveOnSystem,
+    SystemAlreadyHasMaxEnergy,
 }
 
 impl GameState {
@@ -579,12 +607,48 @@ impl GameState {
                             .get_system_state(system)
                             .overloads += 1
                     }
+                    ResolveEffect::OpponentMoveEnergy {
+                        from_system,
+                        to_system,
+                    } => self.move_energy(from_system, to_system, player.other_player())?,
+                    ResolveEffect::MoveEnergy {
+                        from_system,
+                        to_system,
+                    }
+                    | ResolveEffect::MoveEnergyTo {
+                        from_system,
+                        to_system,
+                    } => self.move_energy(from_system, to_system, player)?,
                 }
                 effects_to_resolve.remove(i);
                 Ok(())
             }
             None => Err(UserActionError::NoMatchingEffectToResolve),
         }
+    }
+
+    fn move_energy(
+        &mut self,
+        from_system: System,
+        to_system: System,
+        player: Player,
+    ) -> Result<(), UserActionError> {
+        let my_state = self.my_state(player);
+        let from_system_state = my_state.get_system_state(from_system);
+        if from_system_state.energy <= 0 {
+            return Err(UserActionError::NoEnergyToMoveOnSystem);
+        }
+        from_system_state.energy -= 1;
+
+        let to_system_state = my_state.get_system_state(to_system);
+        if to_system_state.overloads > 0 {
+            return Err(UserActionError::CannotPutEnergyOnDisabledSystem);
+        }
+        if to_system_state.energy == to_system_state.get_allowed_energy() {
+            return Err(UserActionError::SystemAlreadyHasMaxEnergy);
+        }
+        to_system_state.energy += 1;
+        Ok(())
     }
 
     fn receive_user_action(
