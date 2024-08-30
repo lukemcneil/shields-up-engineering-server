@@ -1,7 +1,11 @@
+mod cards;
+mod client;
 mod tests;
 
 use std::collections::BTreeMap;
 
+use cards::get_deck;
+use client::get_user_action;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
@@ -46,6 +50,7 @@ enum Effect {
     // UseSystemCards(System),
 }
 
+#[derive(Debug, Clone)]
 enum ResolveEffect {
     GainShortCircuit,
     LoseShortCircuit,
@@ -315,6 +320,7 @@ enum Action {
     ReduceShortCircuits,
 }
 
+#[derive(Debug, Clone)]
 enum UserAction {
     ChooseAction { action: Action },
     ResolveEffect { resolve_effect: ResolveEffect },
@@ -361,14 +367,17 @@ struct GameState {
 
 impl GameState {
     fn start_state() -> Self {
-        let player1 = PlayerState::start_state();
-        let player2 = PlayerState::start_state();
+        let mut player1 = PlayerState::start_state();
+        let mut player2 = PlayerState::start_state();
+        let mut deck = get_deck();
+        player1.hand = deck.drain(0..3).collect();
+        player2.hand = deck.drain(0..3).collect();
         Self {
             players_turn: Player::Player1,
             turn_state: TurnState::ChoosingAction,
             player1,
             player2,
-            deck: vec![Card::default(), Card::default()],
+            deck,
             discard_pile: vec![],
             actions_left: 3,
         }
@@ -756,6 +765,13 @@ impl GameState {
         }
     }
 
+    fn my_state_immut(&self, player: Player) -> &PlayerState {
+        match player {
+            Player::Player1 => &self.player1,
+            Player::Player2 => &self.player2,
+        }
+    }
+
     fn opponent_state(&mut self, player: Player) -> &mut PlayerState {
         match player {
             Player::Player1 => &mut self.player2,
@@ -766,14 +782,26 @@ impl GameState {
 
 fn main() {
     let mut game_state = GameState::start_state();
-    let result = game_state.receive_user_action(UserActionWithPlayer {
-        player: Player::Player1,
-        user_action: UserAction::ChooseAction {
-            action: Action::ReduceShortCircuits,
-        },
-    });
-    assert!(result.is_ok());
-    // loop {
-    //     game_state
-    // }
+    let mut players_turn = game_state.players_turn;
+    let mut turns = 0;
+    loop {
+        let user_action = get_user_action(&game_state);
+        match game_state.receive_user_action(UserActionWithPlayer {
+            player: game_state.players_turn,
+            user_action: user_action.clone(),
+        }) {
+            Ok(()) => println!("did user action {:?}", user_action),
+            Err(_e) => {
+                // println!("failed to do action: {:?}", e)
+            }
+        }
+        if players_turn != game_state.players_turn {
+            turns += 1;
+            players_turn = game_state.players_turn;
+        }
+        if game_state.player1.hull_damage >= 50 || game_state.player2.hull_damage >= 50 {
+            println!("game over after {turns} turns");
+            return;
+        }
+    }
 }
