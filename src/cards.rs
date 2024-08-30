@@ -45,7 +45,11 @@ fn get_card1() -> Card {
             Effect::Draw,
             Effect::Draw,
         ],
-        hot_wire_effects: vec![Effect::StoreMoreEnergy, Effect::StoreMoreEnergy],
+        hot_wire_effects: vec![
+            Effect::StoreMoreEnergy,
+            Effect::StoreMoreEnergy,
+            Effect::UseSystemCards(System::Weapons),
+        ],
         hot_wire_cost: HotWireCost {
             short_circuits: 1,
             cards_to_discard: 0,

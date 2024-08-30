@@ -291,4 +291,55 @@ mod tests {
         assert_eq!(game_state.player2.weapons_system.energy, 2);
         assert_eq!(game_state.player2.life_support.energy, 1);
     }
+
+    #[test]
+    fn test_use_system_cards() {
+        let mut game_state = GameState::start_state();
+        game_state.player1.hand = vec![
+            Card {
+                instant_effects: vec![],
+                hot_wire_effects: vec![Effect::UseSystemCards(System::ShieldGenerator)],
+                hot_wire_cost: HotWireCost {
+                    short_circuits: 0,
+                    cards_to_discard: 0,
+                },
+                system: Some(System::Weapons),
+            },
+            Card {
+                instant_effects: vec![],
+                hot_wire_effects: vec![],
+                hot_wire_cost: HotWireCost {
+                    short_circuits: 0,
+                    cards_to_discard: 0,
+                },
+                system: Some(System::ShieldGenerator),
+            },
+        ];
+
+        let result = game_state.receive_user_action(UserActionWithPlayer {
+            player: Player::Player1,
+            user_action: UserAction::ChooseAction {
+                action: Action::HotWireCard {
+                    card_index: 0,
+                    system: System::Weapons,
+                    indices_to_discard: vec![],
+                },
+            },
+        });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.actions_left, 2);
+
+        let result = game_state.receive_user_action(UserActionWithPlayer {
+            player: Player::Player1,
+            user_action: UserAction::ChooseAction {
+                action: Action::HotWireCard {
+                    card_index: 0,
+                    system: System::Weapons,
+                    indices_to_discard: vec![],
+                },
+            },
+        });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.actions_left, 1);
+    }
 }

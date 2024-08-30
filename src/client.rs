@@ -118,9 +118,6 @@ impl Effect {
         match self {
             Effect::GainShortCircuit => Some(ResolveEffect::GainShortCircuit),
             Effect::LoseShortCircuit => Some(ResolveEffect::LoseShortCircuit),
-            Effect::StoreMoreEnergy => None,
-            Effect::UseMoreEnergy => None,
-            Effect::UseLessEnergy => None,
             Effect::Shield => Some(ResolveEffect::Shield),
             Effect::Attack => Some(ResolveEffect::Attack),
             Effect::DiscardOverload => Some(ResolveEffect::DiscardOverload {
@@ -158,6 +155,10 @@ impl Effect {
                 to_system: *to_system,
             }),
             Effect::OpponentDiscard => Some(ResolveEffect::OpponentDiscard { card_index: 0 }),
+            Effect::StoreMoreEnergy => None,
+            Effect::UseMoreEnergy => None,
+            Effect::UseLessEnergy => None,
+            Effect::UseSystemCards(_) => None,
         }
     }
 }

@@ -47,7 +47,7 @@ enum Effect {
     // DrawPowerFrom(System),
     MoveEnergy,
     MoveEnergyTo(System),
-    // UseSystemCards(System),
+    UseSystemCards(System),
 }
 
 #[derive(Debug, Clone)]
@@ -130,7 +130,10 @@ impl Effect {
             | Effect::MoveEnergy
             | Effect::MoveEnergyTo(_)
             | Effect::OpponentDiscard => true,
-            Effect::StoreMoreEnergy | Effect::UseMoreEnergy | Effect::UseLessEnergy => false,
+            Effect::StoreMoreEnergy
+            | Effect::UseMoreEnergy
+            | Effect::UseLessEnergy
+            | Effect::UseSystemCards(_) => false,
         }
     }
 
@@ -152,7 +155,8 @@ impl Effect {
             | Effect::OpponentGainOverload
             | Effect::OpponentMoveEnergy
             | Effect::MoveEnergy
-            | Effect::MoveEnergyTo(_) => false,
+            | Effect::MoveEnergyTo(_)
+            | Effect::UseSystemCards(_) => false,
         }
     }
 }
@@ -200,6 +204,19 @@ impl SystemState {
             })
             .sum::<i32>()
             .max(1)
+    }
+
+    fn get_allowed_system_cards(&self) -> Vec<System> {
+        let mut additional: Vec<System> = self
+            .get_hot_wire_effects()
+            .iter()
+            .filter_map(|effect| match effect {
+                Effect::UseSystemCards(system) => Some(*system),
+                _ => None,
+            })
+            .collect();
+        additional.push(self.system);
+        additional
     }
 }
 
@@ -444,15 +461,14 @@ impl GameState {
             return Err(UserActionError::InvalidCardIndex);
         }
         let card = my_state.hand.remove(card_index);
+        let system_state = my_state.get_system_state(system);
         if let Some(card_system) = card.system {
-            if card_system != system {
+            let allowed_system_cards = system_state.get_allowed_system_cards();
+            if !allowed_system_cards.contains(&card_system) {
                 return Err(UserActionError::CannotHotWireCardOnThisSystem);
             }
         }
-        my_state
-            .get_system_state(system)
-            .hot_wires
-            .push(card.clone());
+        system_state.hot_wires.push(card.clone());
         my_state.short_circuits =
             (my_state.short_circuits + card.hot_wire_cost.short_circuits).max(0);
         if card.hot_wire_cost.cards_to_discard > my_state.hand.len() {
