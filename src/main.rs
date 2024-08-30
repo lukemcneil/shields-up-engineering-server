@@ -477,6 +477,7 @@ impl GameState {
         if action.action_points() > self.actions_left {
             return Err(UserActionError::NotEnoughActionsLeft);
         }
+        let my_state = self.my_state(player);
         let result = match action.clone() {
             Action::HotWireCard {
                 card_index,
@@ -484,7 +485,6 @@ impl GameState {
                 indices_to_discard,
             } => self.hot_wire_card(card_index, system, indices_to_discard, player),
             Action::PlayInstantCard { card_index } => {
-                let my_state = self.my_state(player);
                 if card_index >= my_state.hand.len() {
                     return Err(UserActionError::InvalidCardIndex);
                 }
@@ -499,7 +499,6 @@ impl GameState {
                 system,
                 energy_distribution,
             } => {
-                let my_state = self.my_state(player);
                 if my_state.get_system_state(system).overloads > 0 {
                     return Err(UserActionError::CannotActivateOverloadedSystem);
                 }
@@ -534,7 +533,6 @@ impl GameState {
                 Ok(())
             }
             Action::DiscardOverload { system } => {
-                let my_state = self.my_state(player);
                 let system_state = my_state.get_system_state(system);
                 if system_state.overloads > 0 {
                     system_state.overloads -= 1;
@@ -544,7 +542,6 @@ impl GameState {
                 }
             }
             Action::ReduceShortCircuits => {
-                let my_state = self.my_state(player);
                 my_state.short_circuits = (my_state.short_circuits - 2).max(0);
                 Ok(())
             }
@@ -566,6 +563,7 @@ impl GameState {
             .position(|&e| e == resolve_effect.effect_this_resolves())
         {
             Some(i) => {
+                let my_state = self.my_state(player);
                 match resolve_effect {
                     ResolveEffect::Attack => {
                         let opponent_state = self.opponent_state(player);
@@ -575,9 +573,8 @@ impl GameState {
                             opponent_state.hull_damage += 1;
                         }
                     }
-                    ResolveEffect::GainShortCircuit => self.my_state(player).short_circuits += 1,
+                    ResolveEffect::GainShortCircuit => my_state.short_circuits += 1,
                     ResolveEffect::LoseShortCircuit => {
-                        let my_state = self.my_state(player);
                         if my_state.short_circuits > 0 {
                             my_state.short_circuits -= 1;
                         } else {
@@ -585,7 +582,6 @@ impl GameState {
                         }
                     }
                     ResolveEffect::Shield => {
-                        let my_state = self.my_state(player);
                         let max_shields = my_state.shield_generator.get_allowed_energy();
                         if my_state.shields < max_shields {
                             my_state.shields += 1;
@@ -594,7 +590,6 @@ impl GameState {
                         }
                     }
                     ResolveEffect::DiscardOverload { system } => {
-                        let my_state = self.my_state(player);
                         let system_state = my_state.get_system_state(system);
                         if system_state.overloads > 0 {
                             system_state.overloads -= 1;
