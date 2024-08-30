@@ -39,7 +39,7 @@ enum Effect {
     // Discard, // this only appears as a cost to hot wire a card
     Draw,
 
-    // OpponentDiscard, // TODO: put back in
+    OpponentDiscard,
     OpponentGainShortCircuit,
     OpponentLoseShield,
     OpponentMoveEnergy,
@@ -67,9 +67,9 @@ enum ResolveEffect {
         indices_to_discard: Vec<usize>,
     },
     Draw,
-    // OpponentDiscard {
-    //     card_index: usize,
-    // },
+    OpponentDiscard {
+        card_index: usize,
+    },
     OpponentGainShortCircuit,
     OpponentLoseShield,
     OpponentMoveEnergy {
@@ -107,6 +107,7 @@ impl ResolveEffect {
             ResolveEffect::OpponentMoveEnergy { .. } => Effect::OpponentMoveEnergy,
             ResolveEffect::MoveEnergy { .. } => Effect::MoveEnergy,
             ResolveEffect::MoveEnergyTo { to_system, .. } => Effect::MoveEnergyTo(*to_system),
+            ResolveEffect::OpponentDiscard { .. } => Effect::OpponentDiscard,
         }
     }
 }
@@ -127,14 +128,15 @@ impl Effect {
             | Effect::OpponentGainOverload
             | Effect::OpponentMoveEnergy
             | Effect::MoveEnergy
-            | Effect::MoveEnergyTo(_) => true,
+            | Effect::MoveEnergyTo(_)
+            | Effect::OpponentDiscard => true,
             Effect::StoreMoreEnergy | Effect::UseMoreEnergy | Effect::UseLessEnergy => false,
         }
     }
 
     fn must_resolve(&self) -> bool {
         match self {
-            Effect::GainShortCircuit => true,
+            Effect::GainShortCircuit | Effect::OpponentDiscard => true,
             Effect::LoseShortCircuit
             | Effect::StoreMoreEnergy
             | Effect::UseMoreEnergy
@@ -328,6 +330,7 @@ enum UserAction {
     StopResolvingEffects,
 }
 
+#[derive(Debug, Clone)]
 struct UserActionWithPlayer {
     player: Player,
     user_action: UserAction,
@@ -425,6 +428,7 @@ enum UserActionError {
     NoCardToDraw,
     NoEnergyToMoveOnSystem,
     SystemAlreadyHasMaxEnergy,
+    ActivePlayerCannotResolveOpponentDiscard,
 }
 
 impl GameState {
@@ -642,6 +646,9 @@ impl GameState {
                         from_system,
                         to_system,
                     } => self.move_energy(from_system, to_system, player)?,
+                    ResolveEffect::OpponentDiscard { .. } => {
+                        return Err(UserActionError::ActivePlayerCannotResolveOpponentDiscard)
+                    }
                 }
                 effects_to_resolve.remove(i);
                 Ok(())
@@ -739,13 +746,45 @@ impl GameState {
                 }
             }
         } else {
-            println!("making a user action when it's not your turn");
-            Err(UserActionError::NotYourTurn)
+            match (self.turn_state.clone(), user_action_with_player.user_action) {
+                (
+                    TurnState::ResolvingEffects { mut effects },
+                    UserAction::ResolveEffect { resolve_effect },
+                ) => {
+                    if let ResolveEffect::OpponentDiscard { card_index } = resolve_effect {
+                        match effects
+                            .iter()
+                            .position(|&e| e == resolve_effect.effect_this_resolves())
+                        {
+                            Some(i) => {
+                                let my_state = self.my_state(player);
+                                if card_index >= my_state.hand.len() {
+                                    return Err(UserActionError::InvalidCardIndex);
+                                }
+                                let card = my_state.hand.remove(card_index);
+                                self.discard_pile.push(card);
+                                effects.remove(i);
+                                if effects.is_empty() {
+                                    self.turn_state = TurnState::ChoosingAction;
+                                } else {
+                                    self.turn_state = TurnState::ResolvingEffects { effects };
+                                }
+                                Ok(())
+                            }
+                            None => return Err(UserActionError::NoMatchingEffectToResolve),
+                        }
+                    } else {
+                        Err(UserActionError::NotYourTurn)
+                    }
+                }
+                _ => Err(UserActionError::NotYourTurn),
+            }
         };
         if result.is_err() {
             *self = game_state_before;
         }
         self.remove_effects_without_immediate_effects();
+        self.remove_opponent_discards_if_no_cards();
         result
     }
 
@@ -770,6 +809,14 @@ impl GameState {
     fn remove_effects_without_immediate_effects(&mut self) {
         if let TurnState::ResolvingEffects { effects } = &mut self.turn_state {
             effects.retain(Effect::has_immediate_effect);
+        }
+    }
+
+    fn remove_opponent_discards_if_no_cards(&mut self) {
+        if self.opponent_state(self.players_turn).hand.is_empty() {
+            if let TurnState::ResolvingEffects { effects } = &mut self.turn_state {
+                effects.retain(|&e| e != Effect::OpponentDiscard);
+            }
         }
     }
 
@@ -804,24 +851,22 @@ fn main() {
     let mut pass_count = 0;
     let mut stop_resolving_count = 0;
     loop {
-        let user_action = get_user_action(&game_state);
+        let user_action_with_player = get_user_action(&game_state);
         assert_eq!(game_state.get_total_cards(), 23);
         let game_state_before = game_state.clone();
-        match game_state.receive_user_action(UserActionWithPlayer {
-            player: game_state.players_turn,
-            user_action: user_action.clone(),
-        }) {
+        match game_state.receive_user_action(user_action_with_player.clone()) {
             Ok(()) => {
                 assert_ne!(game_state_before, game_state);
-                match &user_action {
+                match &user_action_with_player.user_action {
                     UserAction::ChooseAction { .. } => action_count += 1,
                     UserAction::ResolveEffect { .. } => effect_count += 1,
                     UserAction::Pass { .. } => pass_count += 1,
                     UserAction::StopResolvingEffects => stop_resolving_count += 1,
                 }
-                println!("did user action {:?}", user_action)
+                println!("did user action {:?}", user_action_with_player)
             }
             Err(_e) => {
+                // println!("{:?}", _e);
                 assert_eq!(game_state_before, game_state);
             }
         }

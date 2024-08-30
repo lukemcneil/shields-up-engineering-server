@@ -17,18 +17,21 @@ fn random_system() -> System {
     }
 }
 
-pub fn get_user_action(game_state: &GameState) -> UserAction {
+pub fn get_user_action(game_state: &GameState) -> UserActionWithPlayer {
     let player = game_state.players_turn;
     let my_state = game_state.my_state_immut(player);
-    match &game_state.turn_state {
+    let user_action = match &game_state.turn_state {
         TurnState::ChoosingAction => {
             if game_state.actions_left == 0 {
                 let mut card_indices_to_discard = vec![];
                 if my_state.hand.len() > 5 {
                     card_indices_to_discard = (0..(my_state.hand.len() - 5)).collect();
                 }
-                return UserAction::Pass {
-                    card_indices_to_discard,
+                return UserActionWithPlayer {
+                    player,
+                    user_action: UserAction::Pass {
+                        card_indices_to_discard,
+                    },
                 };
             }
             let action = match random_option(5) {
@@ -78,6 +81,11 @@ pub fn get_user_action(game_state: &GameState) -> UserAction {
         TurnState::ResolvingEffects { effects } => {
             for effect in effects {
                 if let Some(resolve_effect) = effect.get_resolution(game_state) {
+                    let player = if let ResolveEffect::OpponentDiscard { .. } = resolve_effect {
+                        player.other_player()
+                    } else {
+                        player
+                    };
                     let user_action = UserAction::ResolveEffect { resolve_effect };
                     if game_state
                         .clone()
@@ -87,12 +95,19 @@ pub fn get_user_action(game_state: &GameState) -> UserAction {
                         })
                         .is_ok()
                     {
-                        return user_action;
+                        return UserActionWithPlayer {
+                            player,
+                            user_action,
+                        };
                     }
                 }
             }
             UserAction::StopResolvingEffects
         }
+    };
+    UserActionWithPlayer {
+        player,
+        user_action,
     }
 }
 
@@ -142,6 +157,7 @@ impl Effect {
                 from_system: random_system(),
                 to_system: *to_system,
             }),
+            Effect::OpponentDiscard => Some(ResolveEffect::OpponentDiscard { card_index: 0 }),
         }
     }
 }

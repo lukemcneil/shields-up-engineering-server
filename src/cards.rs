@@ -40,6 +40,10 @@ fn get_card1() -> Card {
             Effect::GainShortCircuit,
             Effect::MoveEnergy,
             Effect::MoveEnergyTo(System::Weapons),
+            Effect::OpponentDiscard,
+            Effect::OpponentDiscard,
+            Effect::Draw,
+            Effect::Draw,
         ],
         hot_wire_effects: vec![Effect::StoreMoreEnergy, Effect::StoreMoreEnergy],
         hot_wire_cost: HotWireCost {
@@ -57,6 +61,10 @@ fn get_card2() -> Card {
             Effect::UseLessEnergy,
             Effect::Attack,
             Effect::DiscardOverload,
+            Effect::Draw,
+            Effect::Draw,
+            Effect::OpponentDiscard,
+            Effect::OpponentDiscard,
         ],
         hot_wire_cost: HotWireCost {
             short_circuits: 1,
