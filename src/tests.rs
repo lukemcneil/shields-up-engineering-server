@@ -391,5 +391,9 @@ mod tests {
             });
         assert_eq!(result, Ok(()));
         assert_eq!(game_state.actions_left, 1);
+        assert_eq!(game_state.player1.fusion_reactor.energy, 2);
+        assert_eq!(game_state.player1.weapons_system.energy, 1);
+        assert_eq!(game_state.player1.life_support.energy, 1);
+        assert_eq!(game_state.player1.shield_generator.energy, 1);
     }
 }
