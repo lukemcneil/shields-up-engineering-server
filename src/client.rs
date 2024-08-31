@@ -156,6 +156,7 @@ impl Effect {
                 to_system: *to_system,
             }),
             Effect::OpponentDiscard => Some(ResolveEffect::OpponentDiscard { card_index: 0 }),
+            Effect::BypassShield => Some(ResolveEffect::BypassShield),
             Effect::StoreMoreEnergy
             | Effect::UseMoreEnergy
             | Effect::UseLessEnergy

@@ -48,9 +48,10 @@ enum Effect {
     MoveEnergy,
     MoveEnergyTo(System),
     UseSystemCards(System),
+    BypassShield,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum ResolveEffect {
     GainShortCircuit,
     LoseShortCircuit,
@@ -88,6 +89,7 @@ enum ResolveEffect {
         from_system: System,
         to_system: System,
     }, // UseSystemCards(System),
+    BypassShield,
 }
 
 impl ResolveEffect {
@@ -108,6 +110,7 @@ impl ResolveEffect {
             ResolveEffect::MoveEnergy { .. } => Effect::MoveEnergy,
             ResolveEffect::MoveEnergyTo { to_system, .. } => Effect::MoveEnergyTo(*to_system),
             ResolveEffect::OpponentDiscard { .. } => Effect::OpponentDiscard,
+            ResolveEffect::BypassShield => Effect::BypassShield,
         }
     }
 }
@@ -129,7 +132,8 @@ impl Effect {
             | Effect::OpponentMoveEnergy
             | Effect::MoveEnergy
             | Effect::MoveEnergyTo(_)
-            | Effect::OpponentDiscard => true,
+            | Effect::OpponentDiscard
+            | Effect::BypassShield => true,
             Effect::StoreMoreEnergy
             | Effect::UseMoreEnergy
             | Effect::UseLessEnergy
@@ -158,7 +162,8 @@ impl Effect {
             | Effect::MoveEnergy
             | Effect::MoveEnergyTo(_)
             | Effect::UseSystemCards(_)
-            | Effect::DrawPowerFrom(_) => false,
+            | Effect::DrawPowerFrom(_)
+            | Effect::BypassShield => false,
         }
     }
 }
@@ -464,6 +469,7 @@ enum UserActionError {
     ActivePlayerCannotResolveOpponentDiscard,
     CannotDrawPowerFromSystem,
     IncorrectAmountOfEnergyToUse,
+    CannotResolveBypassShieldWithoutAttack,
 }
 
 impl GameState {
@@ -613,7 +619,7 @@ impl GameState {
             .iter()
             .position(|&e| e == resolve_effect.effect_this_resolves())
         {
-            Some(i) => {
+            Some(mut i) => {
                 let my_state = self.my_state(player);
                 match resolve_effect {
                     ResolveEffect::Attack => {
@@ -694,6 +700,20 @@ impl GameState {
                     } => self.move_energy(from_system, to_system, player)?,
                     ResolveEffect::OpponentDiscard { .. } => {
                         return Err(UserActionError::ActivePlayerCannotResolveOpponentDiscard)
+                    }
+                    ResolveEffect::BypassShield => {
+                        match effects_to_resolve.iter().position(|&e| e == Effect::Attack) {
+                            Some(index_of_attack) => {
+                                effects_to_resolve.remove(index_of_attack);
+                                if i >= index_of_attack {
+                                    i -= 1;
+                                }
+                                self.opponent_state(player).hull_damage += 1;
+                            }
+                            None => {
+                                return Err(UserActionError::CannotResolveBypassShieldWithoutAttack)
+                            }
+                        }
                     }
                 }
                 effects_to_resolve.remove(i);
@@ -909,7 +929,7 @@ fn main() {
                     UserAction::Pass { .. } => pass_count += 1,
                     UserAction::StopResolvingEffects => stop_resolving_count += 1,
                 }
-                println!("did user action {:?}", user_action_with_player)
+                println!("did user action {:?}", user_action_with_player);
             }
             Err(_e) => {
                 // println!("{:?}", _e);

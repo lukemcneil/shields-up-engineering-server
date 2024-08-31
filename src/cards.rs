@@ -63,6 +63,7 @@ fn get_card2() -> Card {
         instant_effects: vec![Effect::Shield, Effect::GainShortCircuit, Effect::Attack],
         hot_wire_effects: vec![
             Effect::UseLessEnergy,
+            Effect::BypassShield,
             Effect::Attack,
             Effect::DiscardOverload,
             Effect::Draw,

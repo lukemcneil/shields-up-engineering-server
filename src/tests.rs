@@ -396,4 +396,77 @@ mod tests {
         assert_eq!(game_state.player1.life_support.energy, 1);
         assert_eq!(game_state.player1.shield_generator.energy, 1);
     }
+
+    #[test]
+    fn test_bypass_shield() {
+        let mut game_state = GameState::start_state();
+        game_state.player1.hand = vec![Card {
+            instant_effects: vec![],
+            hot_wire_effects: vec![Effect::BypassShield, Effect::BypassShield],
+            hot_wire_cost: HotWireCost {
+                short_circuits: 0,
+                cards_to_discard: 0,
+            },
+            system: None,
+        }];
+
+        let result = game_state.receive_user_action(UserActionWithPlayer {
+            player: Player::Player1,
+            user_action: UserAction::ChooseAction {
+                action: Action::HotWireCard {
+                    card_index: 0,
+                    system: System::Weapons,
+                    indices_to_discard: vec![],
+                },
+            },
+        });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.actions_left, 2);
+
+        let result: Result<(), UserActionError> =
+            game_state.receive_user_action(UserActionWithPlayer {
+                player: Player::Player1,
+                user_action: UserAction::ChooseAction {
+                    action: Action::ActivateSystem {
+                        system: System::Weapons,
+                        energy_to_use: None,
+                        energy_distribution: None,
+                    },
+                },
+            });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.actions_left, 1);
+        match &game_state.turn_state {
+            TurnState::ChoosingAction => assert!(false),
+            TurnState::ResolvingEffects { effects } => {
+                assert_eq!(
+                    effects,
+                    &vec![Effect::Attack, Effect::BypassShield, Effect::BypassShield]
+                );
+            }
+        }
+
+        let result: Result<(), UserActionError> =
+            game_state.receive_user_action(UserActionWithPlayer {
+                player: Player::Player1,
+                user_action: UserAction::ResolveEffect {
+                    resolve_effect: ResolveEffect::BypassShield,
+                },
+            });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.player2.hull_damage, 1);
+        assert_eq!(game_state.player2.shields, 2);
+
+        let result: Result<(), UserActionError> =
+            game_state.receive_user_action(UserActionWithPlayer {
+                player: Player::Player1,
+                user_action: UserAction::ResolveEffect {
+                    resolve_effect: ResolveEffect::BypassShield,
+                },
+            });
+        assert_eq!(
+            result,
+            Err(UserActionError::CannotResolveBypassShieldWithoutAttack)
+        );
+    }
 }
