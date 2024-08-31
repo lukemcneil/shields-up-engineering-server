@@ -1,6 +1,6 @@
 use rand::{seq::SliceRandom, thread_rng};
 
-use crate::{Card, Effect, HotWireCost, System};
+use crate::game::{Card, Effect, HotWireCost, System};
 
 pub fn get_deck() -> Vec<Card> {
     let mut deck = vec![

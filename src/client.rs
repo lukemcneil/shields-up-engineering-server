@@ -1,6 +1,8 @@
+use std::collections::BTreeMap;
+
 use rand::Rng;
 
-use crate::*;
+use crate::game::*;
 
 fn random_option(options: usize) -> usize {
     let mut rng = rand::thread_rng();

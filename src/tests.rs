@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use crate::*;
+    use std::collections::BTreeMap;
+
+    use crate::game::*;
 
     #[test]
     fn test_bad_user_action() {
