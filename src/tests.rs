@@ -49,6 +49,7 @@ mod tests {
             user_action: UserAction::ChooseAction {
                 action: Action::ActivateSystem {
                     system: System::FusionReactor,
+                    energy_to_use: None,
                     energy_distribution: None,
                 },
             },
@@ -65,6 +66,7 @@ mod tests {
             user_action: UserAction::ChooseAction {
                 action: Action::ActivateSystem {
                     system: System::FusionReactor,
+                    energy_to_use: None,
                     energy_distribution: Some(bad_energy_distribution),
                 },
             },
@@ -84,6 +86,7 @@ mod tests {
             user_action: UserAction::ChooseAction {
                 action: Action::ActivateSystem {
                     system: System::FusionReactor,
+                    energy_to_use: None,
                     energy_distribution: Some(bad_energy_distribution2),
                 },
             },
@@ -99,6 +102,7 @@ mod tests {
             user_action: UserAction::ChooseAction {
                 action: Action::ActivateSystem {
                     system: System::FusionReactor,
+                    energy_to_use: None,
                     energy_distribution: Some(energy_distribution),
                 },
             },
@@ -121,6 +125,7 @@ mod tests {
             user_action: UserAction::ChooseAction {
                 action: Action::ActivateSystem {
                     system: System::Weapons,
+                    energy_to_use: None,
                     energy_distribution: None,
                 },
             },
@@ -182,6 +187,7 @@ mod tests {
             user_action: UserAction::ChooseAction {
                 action: Action::ActivateSystem {
                     system: System::ShieldGenerator,
+                    energy_to_use: None,
                     energy_distribution: None,
                 },
             },
@@ -339,6 +345,50 @@ mod tests {
                 },
             },
         });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.actions_left, 1);
+    }
+
+    #[test]
+    fn test_draw_power_from() {
+        let mut game_state = GameState::start_state();
+        game_state.player1.hand = vec![Card {
+            instant_effects: vec![],
+            hot_wire_effects: vec![Effect::DrawPowerFrom(System::LifeSupport)],
+            hot_wire_cost: HotWireCost {
+                short_circuits: 0,
+                cards_to_discard: 0,
+            },
+            system: None,
+        }];
+
+        let result = game_state.receive_user_action(UserActionWithPlayer {
+            player: Player::Player1,
+            user_action: UserAction::ChooseAction {
+                action: Action::HotWireCard {
+                    card_index: 0,
+                    system: System::Weapons,
+                    indices_to_discard: vec![],
+                },
+            },
+        });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.actions_left, 2);
+
+        let mut energy_to_use = BTreeMap::new();
+        energy_to_use.insert(System::Weapons, 1);
+        energy_to_use.insert(System::LifeSupport, 1);
+        let result: Result<(), UserActionError> =
+            game_state.receive_user_action(UserActionWithPlayer {
+                player: Player::Player1,
+                user_action: UserAction::ChooseAction {
+                    action: Action::ActivateSystem {
+                        system: System::Weapons,
+                        energy_to_use: Some(energy_to_use),
+                        energy_distribution: None,
+                    },
+                },
+            });
         assert_eq!(result, Ok(()));
         assert_eq!(game_state.actions_left, 1);
     }

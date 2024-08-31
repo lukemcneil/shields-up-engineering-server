@@ -44,7 +44,7 @@ enum Effect {
     OpponentLoseShield,
     OpponentMoveEnergy,
     OpponentGainOverload,
-    // DrawPowerFrom(System),
+    DrawPowerFrom(System),
     MoveEnergy,
     MoveEnergyTo(System),
     UseSystemCards(System),
@@ -133,7 +133,8 @@ impl Effect {
             Effect::StoreMoreEnergy
             | Effect::UseMoreEnergy
             | Effect::UseLessEnergy
-            | Effect::UseSystemCards(_) => false,
+            | Effect::UseSystemCards(_)
+            | Effect::DrawPowerFrom(_) => false,
         }
     }
 
@@ -156,7 +157,8 @@ impl Effect {
             | Effect::OpponentMoveEnergy
             | Effect::MoveEnergy
             | Effect::MoveEnergyTo(_)
-            | Effect::UseSystemCards(_) => false,
+            | Effect::UseSystemCards(_)
+            | Effect::DrawPowerFrom(_) => false,
         }
     }
 }
@@ -212,6 +214,19 @@ impl SystemState {
             .iter()
             .filter_map(|effect| match effect {
                 Effect::UseSystemCards(system) => Some(*system),
+                _ => None,
+            })
+            .collect();
+        additional.push(self.system);
+        additional
+    }
+
+    fn get_allowed_systems_to_draw_energy_from(&self) -> Vec<System> {
+        let mut additional: Vec<System> = self
+            .get_hot_wire_effects()
+            .iter()
+            .filter_map(|effect| match effect {
+                Effect::DrawPowerFrom(system) => Some(*system),
                 _ => None,
             })
             .collect();
@@ -331,6 +346,7 @@ enum Action {
     },
     ActivateSystem {
         system: System,
+        energy_to_use: Option<BTreeMap<System, i32>>,
         energy_distribution: Option<BTreeMap<System, i32>>,
     },
     DiscardOverload {
@@ -446,6 +462,8 @@ enum UserActionError {
     NoEnergyToMoveOnSystem,
     SystemAlreadyHasMaxEnergy,
     ActivePlayerCannotResolveOpponentDiscard,
+    CannotDrawPowerFromSystem,
+    IncorrectAmountOfEnergyToUse,
 }
 
 impl GameState {
@@ -513,6 +531,7 @@ impl GameState {
             }
             Action::ActivateSystem {
                 system,
+                energy_to_use,
                 energy_distribution,
             } => {
                 if my_state.get_system_state(system).overloads > 0 {
@@ -536,12 +555,28 @@ impl GameState {
                     }
                 } else {
                     let system_state = my_state.get_system_state(system);
-                    let energy_used = system_state.get_energy_used();
-                    if energy_used > system_state.energy {
-                        return Err(UserActionError::NotEnoughEnergyToActivate);
+                    let energy_to_use = energy_to_use.unwrap_or_else(|| {
+                        let mut default_energy_to_use = BTreeMap::new();
+                        default_energy_to_use.insert(system, system_state.get_energy_used());
+                        default_energy_to_use
+                    });
+                    if energy_to_use.values().sum::<i32>() != system_state.get_energy_used() {
+                        return Err(UserActionError::IncorrectAmountOfEnergyToUse);
                     }
-                    system_state.energy -= energy_used;
-                    my_state.fusion_reactor.energy += energy_used;
+                    let allowed_systems = system_state.get_allowed_systems_to_draw_energy_from();
+                    for (system_getting_energy_from, energy_used) in energy_to_use {
+                        if !allowed_systems.contains(&system_getting_energy_from) && energy_used > 0
+                        {
+                            return Err(UserActionError::CannotDrawPowerFromSystem);
+                        }
+                        let from_system_state =
+                            my_state.get_system_state(system_getting_energy_from);
+                        if energy_used > from_system_state.energy {
+                            return Err(UserActionError::NotEnoughEnergyToActivate);
+                        }
+                        from_system_state.energy -= energy_used;
+                        my_state.fusion_reactor.energy += energy_used;
+                    }
                 }
                 self.turn_state = TurnState::ResolvingEffects {
                     effects: my_state.get_system_state(system).get_hot_wire_effects(),

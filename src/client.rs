@@ -49,6 +49,7 @@ pub fn get_user_action(game_state: &GameState) -> UserActionWithPlayer {
                     }
                     Action::ActivateSystem {
                         system,
+                        energy_to_use: None,
                         energy_distribution,
                     }
                 }
@@ -155,10 +156,11 @@ impl Effect {
                 to_system: *to_system,
             }),
             Effect::OpponentDiscard => Some(ResolveEffect::OpponentDiscard { card_index: 0 }),
-            Effect::StoreMoreEnergy => None,
-            Effect::UseMoreEnergy => None,
-            Effect::UseLessEnergy => None,
-            Effect::UseSystemCards(_) => None,
+            Effect::StoreMoreEnergy
+            | Effect::UseMoreEnergy
+            | Effect::UseLessEnergy
+            | Effect::UseSystemCards(_)
+            | Effect::DrawPowerFrom(_) => None,
         }
     }
 }

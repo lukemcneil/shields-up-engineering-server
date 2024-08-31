@@ -69,6 +69,7 @@ fn get_card2() -> Card {
             Effect::Draw,
             Effect::OpponentDiscard,
             Effect::OpponentDiscard,
+            Effect::DrawPowerFrom(System::Weapons),
         ],
         hot_wire_cost: HotWireCost {
             short_circuits: 1,
