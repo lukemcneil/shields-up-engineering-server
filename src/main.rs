@@ -918,7 +918,7 @@ fn main() {
     let mut stop_resolving_count = 0;
     loop {
         let user_action_with_player = get_user_action(&game_state);
-        assert_eq!(game_state.get_total_cards(), 23);
+        assert_eq!(game_state.get_total_cards(), 25);
         let game_state_before = game_state.clone();
         match game_state.receive_user_action(user_action_with_player.clone()) {
             Ok(()) => {

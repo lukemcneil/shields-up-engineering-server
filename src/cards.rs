@@ -27,6 +27,8 @@ pub fn get_deck() -> Vec<Card> {
         get_card2(),
         get_card2(),
         get_card2(),
+        get_card3(),
+        get_card3(),
     ];
     deck.shuffle(&mut thread_rng());
     deck
@@ -77,5 +79,28 @@ fn get_card2() -> Card {
             cards_to_discard: 1,
         },
         system: None,
+    }
+}
+
+fn get_card3() -> Card {
+    Card {
+        instant_effects: vec![
+            Effect::OpponentGainOverload,
+            Effect::DiscardOverload,
+            Effect::GainShortCircuit,
+        ],
+        hot_wire_effects: vec![
+            Effect::BypassShield,
+            Effect::GainShortCircuit,
+            Effect::GainShortCircuit,
+            Effect::GainShortCircuit,
+            Effect::UseMoreEnergy,
+            Effect::UseMoreEnergy,
+        ],
+        hot_wire_cost: HotWireCost {
+            short_circuits: 4,
+            cards_to_discard: 0,
+        },
+        system: Some(System::Weapons),
     }
 }
