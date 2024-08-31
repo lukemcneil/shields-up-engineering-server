@@ -2,7 +2,65 @@
 mod tests {
     use std::collections::BTreeMap;
 
-    use crate::game::*;
+    use crate::{client::get_user_action, game::*};
+
+    impl GameState {
+        pub fn get_total_cards(&self) -> usize {
+            self.player1.hand.len()
+                + self.player2.hand.len()
+                + self.player1.fusion_reactor.hot_wires.len()
+                + self.player2.fusion_reactor.hot_wires.len()
+                + self.player1.life_support.hot_wires.len()
+                + self.player2.life_support.hot_wires.len()
+                + self.player1.weapons_system.hot_wires.len()
+                + self.player2.weapons_system.hot_wires.len()
+                + self.player1.shield_generator.hot_wires.len()
+                + self.player2.shield_generator.hot_wires.len()
+                + self.deck.len()
+                + self.discard_pile.len()
+        }
+    }
+
+    #[test]
+    fn test_client() {
+        let mut game_state = GameState::start_state();
+        let mut players_turn = game_state.players_turn;
+        let mut turns = 0;
+        let mut action_count = 0;
+        let mut effect_count = 0;
+        let mut pass_count = 0;
+        let mut stop_resolving_count = 0;
+        loop {
+            let user_action_with_player = get_user_action(&game_state);
+            assert_eq!(game_state.get_total_cards(), 25);
+            let game_state_before = game_state.clone();
+            match game_state.receive_user_action(user_action_with_player.clone()) {
+                Ok(()) => {
+                    assert_ne!(game_state_before, game_state);
+                    match &user_action_with_player.user_action {
+                        UserAction::ChooseAction { .. } => action_count += 1,
+                        UserAction::ResolveEffect { .. } => effect_count += 1,
+                        UserAction::Pass { .. } => pass_count += 1,
+                        UserAction::StopResolvingEffects => stop_resolving_count += 1,
+                    }
+                    println!("did user action {:?}", user_action_with_player);
+                }
+                Err(_e) => {
+                    // println!("{:?}", _e);
+                    assert_eq!(game_state_before, game_state);
+                }
+            }
+            if players_turn != game_state.players_turn {
+                turns += 1;
+                players_turn = game_state.players_turn;
+            }
+            if game_state.player1.hull_damage >= 50 || game_state.player2.hull_damage >= 50 {
+                println!("game over after {turns} turns");
+                println!("actions: {action_count}, effects: {effect_count}, pass: {pass_count}, stop_resolving: {stop_resolving_count}");
+                return;
+            }
+        }
+    }
 
     #[test]
     fn test_bad_user_action() {

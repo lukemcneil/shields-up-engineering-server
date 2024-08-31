@@ -1,47 +1,63 @@
+#[macro_use]
+extern crate rocket;
+
 use client::get_user_action;
-use game::{GameState, UserAction};
+use game::GameState;
+use rocket::get;
 
 mod cards;
 mod client;
 mod game;
 mod tests;
 
-fn main() {
+#[get("/echo")]
+fn echo(ws: ws::WebSocket) -> ws::Channel<'static> {
+    use rocket::futures::{SinkExt, StreamExt};
     let mut game_state = GameState::start_state();
-    let mut players_turn = game_state.players_turn;
-    let mut turns = 0;
-    let mut action_count = 0;
-    let mut effect_count = 0;
-    let mut pass_count = 0;
-    let mut stop_resolving_count = 0;
-    loop {
-        let user_action_with_player = get_user_action(&game_state);
-        assert_eq!(game_state.get_total_cards(), 25);
-        let game_state_before = game_state.clone();
-        match game_state.receive_user_action(user_action_with_player.clone()) {
-            Ok(()) => {
-                assert_ne!(game_state_before, game_state);
-                match &user_action_with_player.user_action {
-                    UserAction::ChooseAction { .. } => action_count += 1,
-                    UserAction::ResolveEffect { .. } => effect_count += 1,
-                    UserAction::Pass { .. } => pass_count += 1,
-                    UserAction::StopResolvingEffects => stop_resolving_count += 1,
+
+    ws.channel(move |mut stream| {
+        Box::pin(async move {
+            let _ = stream
+                .send(ws::Message::Text(
+                    serde_json::to_string(&game_state).unwrap(),
+                ))
+                .await;
+            while let Some(_message) = stream.next().await {
+                loop {
+                    let user_action_with_player = get_user_action(&game_state);
+                    if let Ok(()) = game_state.receive_user_action(user_action_with_player.clone())
+                    {
+                        let _ = stream
+                            .send(ws::Message::Text(
+                                serde_json::to_string(&user_action_with_player).unwrap(),
+                            ))
+                            .await;
+                        let _ = stream
+                            .send(ws::Message::Text(
+                                serde_json::to_string(&game_state.turn_state).unwrap(),
+                            ))
+                            .await;
+                        let _ = stream
+                            .send(ws::Message::Text(
+                                serde_json::to_string(&game_state.actions_left).unwrap(),
+                            ))
+                            .await;
+                        break;
+                    }
                 }
-                println!("did user action {:?}", user_action_with_player);
             }
-            Err(_e) => {
-                // println!("{:?}", _e);
-                assert_eq!(game_state_before, game_state);
-            }
-        }
-        if players_turn != game_state.players_turn {
-            turns += 1;
-            players_turn = game_state.players_turn;
-        }
-        if game_state.player1.hull_damage >= 500 || game_state.player2.hull_damage >= 500 {
-            println!("game over after {turns} turns");
-            println!("actions: {action_count}, effects: {effect_count}, pass: {pass_count}, stop_resolving: {stop_resolving_count}");
-            return;
-        }
-    }
+
+            Ok(())
+        })
+    })
+}
+
+#[get("/")]
+fn hello() -> &'static str {
+    "Hello, world!"
+}
+
+#[launch]
+fn rocket() -> _ {
+    rocket::build().mount("/", routes![hello, echo])
 }

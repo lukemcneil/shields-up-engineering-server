@@ -49,7 +49,7 @@ pub enum Effect {
     BypassShield,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResolveEffect {
     GainShortCircuit,
     LoseShortCircuit,
@@ -337,7 +337,7 @@ impl Action {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Action {
     HotWireCard {
         card_index: usize,
@@ -358,7 +358,7 @@ pub enum Action {
     ReduceShortCircuits,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum UserAction {
     ChooseAction { action: Action },
     ResolveEffect { resolve_effect: ResolveEffect },
@@ -366,7 +366,7 @@ pub enum UserAction {
     StopResolvingEffects,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserActionWithPlayer {
     pub player: Player,
     pub user_action: UserAction,
@@ -421,24 +421,9 @@ impl GameState {
             actions_left: 3,
         }
     }
-
-    pub fn get_total_cards(&self) -> usize {
-        self.player1.hand.len()
-            + self.player2.hand.len()
-            + self.player1.fusion_reactor.hot_wires.len()
-            + self.player2.fusion_reactor.hot_wires.len()
-            + self.player1.life_support.hot_wires.len()
-            + self.player2.life_support.hot_wires.len()
-            + self.player1.weapons_system.hot_wires.len()
-            + self.player2.weapons_system.hot_wires.len()
-            + self.player1.shield_generator.hot_wires.len()
-            + self.player2.shield_generator.hot_wires.len()
-            + self.deck.len()
-            + self.discard_pile.len()
-    }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum UserActionError {
     NotYourTurn,
     NotEnoughCardsToDiscard,
