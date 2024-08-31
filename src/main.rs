@@ -1,8 +1,7 @@
 #[macro_use]
 extern crate rocket;
 
-use client::get_user_action;
-use game::GameState;
+use game::{GameState, UserActionError, UserActionWithPlayer};
 use rocket::get;
 
 mod cards;
@@ -10,8 +9,8 @@ mod client;
 mod game;
 mod tests;
 
-#[get("/echo")]
-fn echo(ws: ws::WebSocket) -> ws::Channel<'static> {
+#[get("/")]
+fn play_game(ws: ws::WebSocket) -> ws::Channel<'static> {
     use rocket::futures::{SinkExt, StreamExt};
     let mut game_state = GameState::start_state();
 
@@ -22,42 +21,52 @@ fn echo(ws: ws::WebSocket) -> ws::Channel<'static> {
                     serde_json::to_string(&game_state).unwrap(),
                 ))
                 .await;
-            while let Some(_message) = stream.next().await {
-                loop {
-                    let user_action_with_player = get_user_action(&game_state);
-                    if let Ok(()) = game_state.receive_user_action(user_action_with_player.clone())
-                    {
-                        let _ = stream
-                            .send(ws::Message::Text(
-                                serde_json::to_string(&user_action_with_player).unwrap(),
-                            ))
-                            .await;
-                        let _ = stream
-                            .send(ws::Message::Text(
-                                serde_json::to_string(&game_state.turn_state).unwrap(),
-                            ))
-                            .await;
-                        let _ = stream
-                            .send(ws::Message::Text(
-                                serde_json::to_string(&game_state.actions_left).unwrap(),
-                            ))
-                            .await;
-                        break;
+            while let Some(message) = stream.next().await {
+                if let ws::Message::Text(text) = message? {
+                    match serde_json::from_str::<UserActionWithPlayer>(&text) {
+                        Ok(user_action_with_player) => {
+                            match game_state.receive_user_action(user_action_with_player) {
+                                Ok(_) => {
+                                    let _ = stream
+                                        .send(ws::Message::Text(
+                                            serde_json::to_string(&game_state).unwrap(),
+                                        ))
+                                        .await;
+                                }
+                                Err(user_action_error) => {
+                                    let _ = stream
+                                        .send(ws::Message::Text(
+                                            serde_json::to_string(&user_action_error).unwrap(),
+                                        ))
+                                        .await;
+                                }
+                            }
+                        }
+                        Err(_) => {
+                            let _ = stream
+                                .send(ws::Message::Text(
+                                    serde_json::to_string(
+                                        &UserActionError::MalformedUserActionWithPlayer,
+                                    )
+                                    .unwrap(),
+                                ))
+                                .await;
+                        }
                     }
+                } else {
+                    let _ = stream
+                        .send(ws::Message::Text(
+                            serde_json::to_string(&UserActionError::SentNonTextMessage).unwrap(),
+                        ))
+                        .await;
                 }
             }
-
             Ok(())
         })
     })
 }
 
-#[get("/")]
-fn hello() -> &'static str {
-    "Hello, world!"
-}
-
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![hello, echo])
+    rocket::build().mount("/", routes![play_game])
 }

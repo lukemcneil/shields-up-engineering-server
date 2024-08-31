@@ -453,6 +453,8 @@ pub enum UserActionError {
     CannotDrawPowerFromSystem,
     IncorrectAmountOfEnergyToUse,
     CannotResolveBypassShieldWithoutAttack,
+    MalformedUserActionWithPlayer,
+    SentNonTextMessage,
 }
 
 impl GameState {
