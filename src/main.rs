@@ -8,8 +8,9 @@ use cards::get_deck;
 use client::get_user_action;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 struct Card {
     instant_effects: Vec<Effect>,
     hot_wire_effects: Vec<Effect>,
@@ -17,13 +18,13 @@ struct Card {
     system: Option<System>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 struct HotWireCost {
     short_circuits: i32,
     cards_to_discard: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 enum Effect {
     GainShortCircuit,
     LoseShortCircuit,
@@ -168,7 +169,7 @@ impl Effect {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct SystemState {
     system: System,
     energy: i32,
@@ -240,7 +241,7 @@ impl SystemState {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy, Serialize, Deserialize)]
 enum System {
     FusionReactor,
     LifeSupport,
@@ -286,7 +287,7 @@ impl System {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct PlayerState {
     hull_damage: i32,
     shields: i32,
@@ -374,7 +375,7 @@ struct UserActionWithPlayer {
     user_action: UserAction,
 }
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Serialize, Deserialize)]
 enum Player {
     Player1,
     Player2,
@@ -389,13 +390,13 @@ impl Player {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 enum TurnState {
     ChoosingAction,
     ResolvingEffects { effects: Vec<Effect> },
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 struct GameState {
     player1: PlayerState,
     player2: PlayerState,
