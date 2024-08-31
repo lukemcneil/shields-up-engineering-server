@@ -25,29 +25,24 @@ fn play_game(ws: ws::WebSocket) -> ws::Channel<'static> {
                 if let ws::Message::Text(text) = message? {
                     match serde_json::from_str::<UserActionWithPlayer>(&text) {
                         Ok(user_action_with_player) => {
-                            match game_state.receive_user_action(user_action_with_player) {
-                                Ok(_) => {
-                                    let _ = stream
-                                        .send(ws::Message::Text(
-                                            serde_json::to_string(&game_state).unwrap(),
-                                        ))
-                                        .await;
-                                }
-                                Err(user_action_error) => {
-                                    let _ = stream
-                                        .send(ws::Message::Text(
-                                            serde_json::to_string(&user_action_error).unwrap(),
-                                        ))
-                                        .await;
-                                }
+                            let result = game_state.receive_user_action(user_action_with_player);
+                            let _ = stream
+                                .send(ws::Message::Text(serde_json::to_string(&result).unwrap()))
+                                .await;
+                            if result.is_ok() {
+                                let _ = stream
+                                    .send(ws::Message::Text(
+                                        serde_json::to_string(&game_state).unwrap(),
+                                    ))
+                                    .await;
                             }
                         }
                         Err(_) => {
                             let _ = stream
                                 .send(ws::Message::Text(
-                                    serde_json::to_string(
-                                        &UserActionError::MalformedUserActionWithPlayer,
-                                    )
+                                    serde_json::to_string(&Err::<(), UserActionError>(
+                                        UserActionError::MalformedUserActionWithPlayer,
+                                    ))
                                     .unwrap(),
                                 ))
                                 .await;
@@ -56,7 +51,10 @@ fn play_game(ws: ws::WebSocket) -> ws::Channel<'static> {
                 } else {
                     let _ = stream
                         .send(ws::Message::Text(
-                            serde_json::to_string(&UserActionError::SentNonTextMessage).unwrap(),
+                            serde_json::to_string(&Err::<(), UserActionError>(
+                                UserActionError::SentNonTextMessage,
+                            ))
+                            .unwrap(),
                         ))
                         .await;
                 }
