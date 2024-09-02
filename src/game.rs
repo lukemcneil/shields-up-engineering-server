@@ -318,6 +318,16 @@ impl PlayerState {
             System::ShieldGenerator => &mut self.shield_generator,
         }
     }
+
+    fn overload_system(&mut self, system: System) {
+        let system_state = self.get_system_state(system);
+        system_state.overloads += 1;
+        if system != System::FusionReactor {
+            let energy_moved = system_state.energy;
+            system_state.energy = 0;
+            self.fusion_reactor.energy += energy_moved;
+        }
+    }
 }
 
 impl Action {
@@ -667,9 +677,7 @@ impl GameState {
                         }
                     }
                     ResolveEffect::OpponentGainOverload { system } => {
-                        self.opponent_state(player)
-                            .get_system_state(system)
-                            .overloads += 1
+                        self.opponent_state(player).overload_system(system)
                     }
                     ResolveEffect::OpponentMoveEnergy {
                         from_system,
@@ -762,18 +770,47 @@ impl GameState {
                     },
                 ) => {
                     self.actions_left = 3;
-                    match self.players_turn {
-                        Player::Player1 => self.players_turn = Player::Player2,
-                        Player::Player2 => self.players_turn = Player::Player1,
-                    }
-                    if self.my_state(player).hand.len() > 5 {
-                        let cards_to_discard = self.my_state(player).hand.len() - 5;
+                    self.players_turn = player.other_player();
+                    let my_state = self.my_state(player);
+                    if my_state.hand.len() > 5 {
+                        let cards_to_discard = my_state.hand.len() - 5;
                         if cards_to_discard != card_indices_to_discard.len() {
                             return Err(UserActionError::WrongNumberOfDiscardIndices);
                         }
                         self.discard(player, card_indices_to_discard)?;
                     }
-                    // TODO: check short circuits
+
+                    let my_state = self.my_state(player);
+                    while my_state.short_circuits >= 5 {
+                        my_state.short_circuits -= 5;
+                        let max_hotwires = [
+                            System::FusionReactor,
+                            System::LifeSupport,
+                            System::ShieldGenerator,
+                            System::Weapons,
+                        ]
+                        .iter()
+                        .map(|&system| my_state.get_system_state(system).hot_wires.len())
+                        .max()
+                        .unwrap();
+                        let systems_with_max_overloads: Vec<System> = [
+                            System::FusionReactor,
+                            System::LifeSupport,
+                            System::ShieldGenerator,
+                            System::Weapons,
+                        ]
+                        .iter()
+                        .filter(|&&system| {
+                            my_state.get_system_state(system).hot_wires.len() == max_hotwires
+                        })
+                        .cloned()
+                        .collect();
+                        my_state.overload_system(
+                            *systems_with_max_overloads
+                                .choose(&mut rand::thread_rng())
+                                .unwrap(),
+                        );
+                    }
                     return Ok(());
                 }
                 (TurnState::ResolvingEffects { effects }, UserAction::StopResolvingEffects) => {

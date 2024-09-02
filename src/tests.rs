@@ -529,4 +529,34 @@ mod tests {
             Err(UserActionError::CannotResolveBypassShieldWithoutAttack)
         );
     }
+
+    #[test]
+    fn test_short_circuits_overload_system() {
+        let mut game_state = GameState::start_state();
+        game_state.player1.hand = vec![Card::default()];
+        let result = game_state.receive_user_action(UserActionWithPlayer {
+            player: Player::Player1,
+            user_action: UserAction::ChooseAction {
+                action: Action::HotWireCard {
+                    card_index: 0,
+                    system: System::Weapons,
+                    indices_to_discard: vec![],
+                },
+            },
+        });
+        assert_eq!(result, Ok(()));
+
+        game_state.player1.short_circuits = 11;
+        let result = game_state.receive_user_action(UserActionWithPlayer {
+            player: Player::Player1,
+            user_action: UserAction::Pass {
+                card_indices_to_discard: vec![],
+            },
+        });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.player1.short_circuits, 1);
+        assert_eq!(game_state.player1.weapons_system.overloads, 2);
+        assert_eq!(game_state.player1.weapons_system.energy, 0);
+        assert_eq!(game_state.player1.fusion_reactor.energy, 2);
+    }
 }
