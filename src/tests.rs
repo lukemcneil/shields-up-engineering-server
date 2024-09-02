@@ -559,4 +559,26 @@ mod tests {
         assert_eq!(game_state.player1.weapons_system.energy, 0);
         assert_eq!(game_state.player1.fusion_reactor.energy, 2);
     }
+
+    #[test]
+    fn test_increase_energy() {
+        let mut game_state = GameState::start_state();
+        game_state.player1.hand = vec![Card {
+            hot_wire_effects: vec![Effect::StoreMoreEnergy, Effect::StoreMoreEnergy],
+            ..Card::default()
+        }];
+        assert_eq!(game_state.player1.fusion_reactor.energy, 0);
+        let result = game_state.receive_user_action(UserActionWithPlayer {
+            player: Player::Player1,
+            user_action: UserAction::ChooseAction {
+                action: Action::HotWireCard {
+                    card_index: 0,
+                    system: System::FusionReactor,
+                    indices_to_discard: vec![],
+                },
+            },
+        });
+        assert_eq!(result, Ok(()));
+        assert_eq!(game_state.player1.fusion_reactor.energy, 2);
+    }
 }

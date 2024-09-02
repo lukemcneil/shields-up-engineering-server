@@ -488,6 +488,13 @@ impl GameState {
             }
         }
         system_state.hot_wires.push(card.clone());
+        if system == System::FusionReactor {
+            my_state.fusion_reactor.energy += card
+                .hot_wire_effects
+                .iter()
+                .filter(|&&effect| effect == Effect::StoreMoreEnergy)
+                .count() as i32;
+        }
         my_state.short_circuits =
             (my_state.short_circuits + card.hot_wire_cost.short_circuits).max(0);
         if card.hot_wire_cost.cards_to_discard > my_state.hand.len() {
