@@ -78,5 +78,10 @@ fn play_game(ws: ws::WebSocket) -> ws::Channel<'static> {
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![play_game])
+    rocket::build()
+        .mount("/", routes![play_game])
+        .configure(rocket::Config {
+            address: "0.0.0.0".parse().unwrap(),
+            ..Default::default()
+        })
 }
