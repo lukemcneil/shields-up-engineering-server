@@ -9,7 +9,7 @@ mod client;
 mod game;
 mod tests;
 
-#[get("/")]
+#[get("/game")]
 fn play_game(ws: ws::WebSocket) -> ws::Channel<'static> {
     use rocket::futures::{SinkExt, StreamExt};
     let mut game_state = GameState::start_state();
@@ -76,10 +76,15 @@ fn play_game(ws: ws::WebSocket) -> ws::Channel<'static> {
     })
 }
 
+#[get("/")]
+fn test() -> String {
+    "shields up engineering".to_string()
+}
+
 #[launch]
 fn rocket() -> _ {
     rocket::build()
-        .mount("/", routes![play_game])
+        .mount("/", routes![play_game, test])
         .configure(rocket::Config {
             address: "0.0.0.0".parse().unwrap(),
             ..Default::default()
