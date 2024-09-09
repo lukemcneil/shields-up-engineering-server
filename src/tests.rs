@@ -2,7 +2,7 @@
 mod tests {
     use std::collections::BTreeMap;
 
-    use crate::{client::get_user_action, game::*};
+    use crate::{cards::get_deck, client::get_user_action, game::*};
 
     impl GameState {
         pub fn get_total_cards(&self) -> usize {
@@ -30,9 +30,10 @@ mod tests {
         let mut effect_count = 0;
         let mut pass_count = 0;
         let mut stop_resolving_count = 0;
+        let deck_len = get_deck().len();
         loop {
             let user_action_with_player = get_user_action(&game_state);
-            assert_eq!(game_state.get_total_cards(), 25);
+            assert_eq!(game_state.get_total_cards(), deck_len);
             let game_state_before = game_state.clone();
             match game_state.receive_user_action(user_action_with_player.clone()) {
                 Ok(()) => {
@@ -223,6 +224,7 @@ mod tests {
                     cards_to_discard: 1,
                 },
                 system: Some(System::ShieldGenerator),
+                ..Default::default()
             },
             Card::default(),
         ];
@@ -303,6 +305,7 @@ mod tests {
                 cards_to_discard: 0,
             },
             system: None,
+            ..Default::default()
         }];
         let result = game_state.receive_user_action(UserActionWithPlayer {
             player: Player::Player1,
@@ -370,6 +373,7 @@ mod tests {
                     cards_to_discard: 0,
                 },
                 system: Some(System::Weapons),
+                ..Default::default()
             },
             Card {
                 instant_effects: vec![],
@@ -379,6 +383,7 @@ mod tests {
                     cards_to_discard: 0,
                 },
                 system: Some(System::ShieldGenerator),
+                ..Default::default()
             },
         ];
 
@@ -420,6 +425,7 @@ mod tests {
                 cards_to_discard: 0,
             },
             system: None,
+            ..Default::default()
         }];
 
         let result = game_state.receive_user_action(UserActionWithPlayer {
@@ -468,6 +474,7 @@ mod tests {
                 cards_to_discard: 0,
             },
             system: None,
+            ..Default::default()
         }];
 
         let result = game_state.receive_user_action(UserActionWithPlayer {

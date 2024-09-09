@@ -13,6 +13,7 @@ pub struct Card {
     pub hot_wire_effects: Vec<Effect>,
     pub hot_wire_cost: HotWireCost,
     pub system: Option<System>,
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

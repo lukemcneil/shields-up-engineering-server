@@ -13,6 +13,18 @@ mod tests;
 fn play_game(ws: ws::WebSocket) -> ws::Channel<'static> {
     use rocket::futures::{SinkExt, StreamExt};
     let mut game_state = GameState::start_state();
+    game_state.player1.life_support.hot_wires = vec![game_state.deck.pop().unwrap()];
+    game_state.player1.shield_generator.hot_wires = vec![
+        game_state.deck.pop().unwrap(),
+        game_state.deck.pop().unwrap(),
+    ];
+
+    game_state.player2.weapons_system.hot_wires = vec![
+        game_state.deck.pop().unwrap(),
+        game_state.deck.pop().unwrap(),
+    ];
+
+    game_state.player1.life_support.overloads = 3;
 
     ws.channel(move |mut stream| {
         Box::pin(async move {
