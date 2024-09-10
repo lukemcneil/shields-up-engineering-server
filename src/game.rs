@@ -552,6 +552,9 @@ impl GameState {
                         if allocated_energy != my_state.fusion_reactor.get_allowed_energy() {
                             return Err(UserActionError::InvalidEnergyDistribution);
                         }
+                        if energy_distribution.len() != 4 {
+                            return Err(UserActionError::InvalidEnergyDistribution);
+                        }
                         for (system, energy) in energy_distribution {
                             let system_state = my_state.get_system_state(system);
                             if system_state.overloads > 0 && energy > 0 {

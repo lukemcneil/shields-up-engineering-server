@@ -24,8 +24,6 @@ fn play_game(ws: ws::WebSocket) -> ws::Channel<'static> {
         game_state.deck.pop().unwrap(),
     ];
 
-    game_state.player1.life_support.overloads = 3;
-
     ws.channel(move |mut stream| {
         Box::pin(async move {
             let _ = stream
@@ -35,6 +33,7 @@ fn play_game(ws: ws::WebSocket) -> ws::Channel<'static> {
                 .await;
             while let Some(message) = stream.next().await {
                 if let ws::Message::Text(text) = message? {
+                    println!("received: {}", text);
                     match serde_json::from_str::<UserActionWithPlayer>(&text) {
                         Ok(user_action_with_player) => {
                             let result = game_state.receive_user_action(user_action_with_player);
