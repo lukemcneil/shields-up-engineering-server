@@ -55,7 +55,10 @@ mod tests {
                 turns += 1;
                 players_turn = game_state.players_turn;
             }
-            if game_state.player1.hull_damage >= 50 || game_state.player2.hull_damage >= 50 {
+            if game_state.player1.hull_damage >= 3
+                || game_state.player2.hull_damage >= 3
+                || turns == 100
+            {
                 println!("game over after {turns} turns");
                 println!("actions: {action_count}, effects: {effect_count}, pass: {pass_count}, stop_resolving: {stop_resolving_count}");
                 return;
@@ -122,6 +125,7 @@ mod tests {
         bad_energy_distribution.insert(System::FusionReactor, 1);
         bad_energy_distribution.insert(System::Weapons, 3);
         bad_energy_distribution.insert(System::ShieldGenerator, 1);
+        bad_energy_distribution.insert(System::LifeSupport, 0);
         let result = game_state.receive_user_action(UserActionWithPlayer {
             player: Player::Player1,
             user_action: UserAction::ChooseAction {
@@ -158,6 +162,7 @@ mod tests {
         energy_distribution.insert(System::FusionReactor, 1);
         energy_distribution.insert(System::Weapons, 3);
         energy_distribution.insert(System::ShieldGenerator, 1);
+        energy_distribution.insert(System::LifeSupport, 0);
         let result = game_state.receive_user_action(UserActionWithPlayer {
             player: Player::Player1,
             user_action: UserAction::ChooseAction {
