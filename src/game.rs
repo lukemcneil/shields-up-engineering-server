@@ -780,8 +780,6 @@ impl GameState {
                         card_indices_to_discard,
                     },
                 ) => {
-                    self.actions_left = 3;
-                    self.players_turn = player.other_player();
                     let my_state = self.my_state(player);
                     if my_state.hand.len() > 5 {
                         let cards_to_discard = my_state.hand.len() - 5;
@@ -790,6 +788,8 @@ impl GameState {
                         }
                         self.discard(player, card_indices_to_discard)?;
                     }
+                    self.actions_left = 3;
+                    self.players_turn = player.other_player();
 
                     let my_state = self.my_state(player);
                     while my_state.short_circuits >= 5 {
@@ -822,7 +822,7 @@ impl GameState {
                                 .unwrap(),
                         );
                     }
-                    return Ok(());
+                    Ok(())
                 }
                 (TurnState::ResolvingEffects { effects }, UserAction::StopResolvingEffects) => {
                     if effects.iter().any(Effect::must_resolve) {
