@@ -38,3 +38,22 @@ cargo test           # run all tests
 - Clients send `UserActionWithPlayer` as JSON (contains `player` and `user_action`)
 - Server responds with `Result<(), UserActionError>` for each action
 - On successful action, updated `GameState` is broadcast to all clients
+
+## Web Client
+
+A browser-based client lives in `shields-up-engineering-client/` (sibling directory to the server).
+
+```bash
+# Start the server (from server dir)
+cargo run                                    # runs on port 8000
+
+# Start the client (from client dir)
+cd ../shields-up-engineering-client
+python3 -m http.server 3000                  # serves on port 3000
+```
+
+- Open two browser tabs to `http://localhost:3000`
+- Tab 1: select Player 1, enter game name, connect
+- Tab 2: select Player 2, enter same game name, connect
+- Vanilla HTML/CSS/JS — no build step, no framework
+- Card images in `cards/` (symlink to `../cards/`)
