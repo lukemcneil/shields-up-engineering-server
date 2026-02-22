@@ -180,6 +180,7 @@ mod tests {
             TurnState::ResolvingEffects { effects } => {
                 assert_eq!(effects, vec![])
             }
+            TurnState::GameOver { .. } => panic!("unexpected GameOver"),
         }
     }
 
@@ -203,6 +204,7 @@ mod tests {
             TurnState::ResolvingEffects { effects } => {
                 assert_eq!(effects, &vec![Effect::Attack]);
             }
+            TurnState::GameOver { .. } => panic!("unexpected GameOver"),
         }
 
         let result = game_state.receive_user_action(UserActionWithPlayer {
@@ -266,6 +268,7 @@ mod tests {
             TurnState::ResolvingEffects { effects } => {
                 assert_eq!(effects, &vec![Effect::Shield, Effect::Shield]);
             }
+            TurnState::GameOver { .. } => panic!("unexpected GameOver"),
         }
 
         let result = game_state.receive_user_action(UserActionWithPlayer {
@@ -516,6 +519,7 @@ mod tests {
                     &vec![Effect::Attack, Effect::BypassShield, Effect::BypassShield]
                 );
             }
+            TurnState::GameOver { .. } => panic!("unexpected GameOver"),
         }
 
         let result: Result<(), UserActionError> =

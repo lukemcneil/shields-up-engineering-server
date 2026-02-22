@@ -109,6 +109,9 @@ pub fn get_user_action(game_state: &GameState) -> UserActionWithPlayer {
             }
             UserAction::StopResolvingEffects
         }
+        TurnState::GameOver { .. } => {
+            panic!("get_user_action called on a finished game");
+        }
     };
     UserActionWithPlayer {
         player,

@@ -402,6 +402,7 @@ impl Player {
 pub enum TurnState {
     ChoosingAction,
     ResolvingEffects { effects: Vec<Effect> },
+    GameOver { winner: Player },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -466,6 +467,7 @@ pub enum UserActionError {
     CannotResolveBypassShieldWithoutAttack,
     MalformedUserActionWithPlayer,
     SentNonTextMessage,
+    GameIsOver,
 }
 
 impl GameState {
@@ -755,6 +757,9 @@ impl GameState {
         &mut self,
         user_action_with_player: UserActionWithPlayer,
     ) -> Result<(), UserActionError> {
+        if let TurnState::GameOver { .. } = self.turn_state {
+            return Err(UserActionError::GameIsOver);
+        }
         let game_state_before = self.clone();
         let player = user_action_with_player.player;
         let result = if self.players_turn == player {
@@ -843,6 +848,7 @@ impl GameState {
                 (TurnState::ChoosingAction, UserAction::StopResolvingEffects) => {
                     Err(UserActionError::InvalidUserAction)
                 }
+                (TurnState::GameOver { .. }, _) => Err(UserActionError::GameIsOver),
             }
         } else {
             match (self.turn_state.clone(), user_action_with_player.user_action) {
@@ -884,7 +890,11 @@ impl GameState {
         }
         self.remove_effects_without_immediate_effects();
         self.remove_opponent_discards_if_no_cards();
-        // TODO: check if someone won
+        if self.player1.hull_damage >= 5 || self.player1.short_circuits >= 12 {
+            self.turn_state = TurnState::GameOver { winner: Player::Player2 };
+        } else if self.player2.hull_damage >= 5 || self.player2.short_circuits >= 12 {
+            self.turn_state = TurnState::GameOver { winner: Player::Player1 };
+        }
         result
     }
 
